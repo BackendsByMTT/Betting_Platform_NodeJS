@@ -193,6 +193,7 @@ class ProcessingQueueWorker {
         }
 
         currentBetDetail.status = result;
+        currentBetDetail.isResolved = true;
         await currentBetDetail.save();
         console.log(`BetDetail with ID ${currentBetDetail._id} updated to '${result}'`);
 
