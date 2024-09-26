@@ -59,7 +59,7 @@ pipeline {
                         git commit -m "Add build"
                         git branch -M dev-build
                         git remote set-url origin https://github.com/BackendsByMTT/Betting_Platform_NodeJS
-                        git push https://${Token}@https://github.com/BackendsByMTT/Betting_Platform_NodeJS dev-build --force
+                        git push https://${Token}@github.com/BackendsByMTT/Betting_Platform_NodeJS dev-build --force
                      else
                         echo 'No changes to commit'
                      fi
