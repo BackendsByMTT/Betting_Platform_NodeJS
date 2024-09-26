@@ -43,6 +43,8 @@ class BetController {
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
+      // console.log(betDetails, "BET DETAILS");
+      // return;
 
       // const tempBetId = betDetailIds.id
 
@@ -74,71 +76,88 @@ class BetController {
       }
 
 
-      // for (const betDetailData of betDetails) {
-
-      //   const cacheKey = `eventOdds:${betDetailData.sport_key}:${betDetailData.event_id}:${betDetailData.category}`;
-        
-      //   let cachedOddsData:any = await redisClient.get(cacheKey);
-        
-      //   if (!cachedOddsData) {
-      //     const oddsData = await Store.getEventOdds(
-      //       betDetailData.sport_key,
-      //       betDetailData.event_id,
-      //       betDetailData.category,
-      //       'us',
-      //       'decimal',
-      //       'iso'
-      //     );
+      //   for (const betDetailData of betDetails) {
+      //     const cacheKey = `eventOdds:${betDetailData.sport_key}:${betDetailData.event_id}:${betDetailData.category}`;
           
-      //     cachedOddsData = JSON.stringify(oddsData);
+      //     let cachedOddsData:any = await redisClient.get(cacheKey);
           
-      //     await redisClient.set(cacheKey, cachedOddsData, 'EX', 30);
-      //   }
-      
-      //   cachedOddsData = JSON.parse(cachedOddsData);
-      //   console.log(cachedOddsData, "cached odds data");
-      
-      //   let cachedEvent = null;
-      
-      //   if (Array.isArray(cachedOddsData)) {
-      //     cachedEvent = cachedOddsData.find(event => event.id === betDetailData.event_id);
-      //   } else if (cachedOddsData && cachedOddsData.id === betDetailData.event_id) {
-      //     cachedEvent = cachedOddsData;
-      //   }
+      //     // Fetch new odds and set cache if no cached data found
+      //     if (!cachedOddsData) {
+      //       const oddsData = await Store.getEventOdds(
+      //         betDetailData.sport_key,
+      //         betDetailData.event_id,
+      //         betDetailData.category,
+      //         'us',
+      //         'decimal',
+      //         'iso'
+      //       );
+            
+      //       cachedOddsData = JSON.stringify(oddsData);
+            
+      //       // Set cache with expiration time reduced to 3 seconds
+      //       await redisClient.set(cacheKey, cachedOddsData, 'EX', 3);
+      //     }
         
-      //   if (!cachedEvent) {
-      //     throw new Error(`Event with ID ${betDetailData.event_id} not found in cached data.`);
-      //   }
-      
-      //   const cachedBookmaker = cachedEvent.bookmakers.find(bookmaker => bookmaker.key === betDetailData.bookmaker);
-      
-      //   if (!cachedBookmaker) {
-      //     throw new Error(`Bookmaker ${betDetailData.bookmaker} not found for event`);
-      //   }
-      
-      //   const cachedMarket = cachedBookmaker.markets.find(market => market.key === betDetailData.category);
-      
-      //   if (!cachedMarket) {
-      //     throw new Error("Market not found in cached data");
-      //   }
-      
-      //   const cachedOutcome = cachedMarket.outcomes.find(outcome => outcome.name === betDetailData.bet_on.name);
-      //   console.log(cachedOutcome, "co");
-      
-      //   if (!cachedOutcome) {
-      //     throw new Error(`Outcome for ${betDetailData.bet_on.name} not found in cached data`);
-      //   }
+      //     cachedOddsData = JSON.parse(cachedOddsData);
+      //     let cachedEvent = null;
         
-      //   console.log(cachedOutcome.price, betDetailData.bet_on.odds, "cache ODDS");
+      //     if (Array.isArray(cachedOddsData)) {
+      //       cachedEvent = cachedOddsData.find(event => event.id === betDetailData.event_id);
+      //     } else if (cachedOddsData && cachedOddsData.id === betDetailData.event_id) {
+      //       cachedEvent = cachedOddsData;
+      //     }
+          
+      //     if (!cachedEvent) {
+      //       throw new Error(`Event with ID ${betDetailData.event_id} not found in cached data.`);
+      //     }
+        
+      //     const cachedBookmaker = cachedEvent.bookmakers.find(bookmaker => bookmaker.key === betDetailData.bookmaker);
+        
+      //     if (!cachedBookmaker) {
+      //       throw new Error(`Bookmaker ${betDetailData.bookmaker} not found for event`);
+      //     }
+        
+      //     const cachedMarket = cachedBookmaker.markets.find(market => market.key === betDetailData.category);
+        
+      //     if (!cachedMarket) {
+      //       throw new Error("Market not found in cached data");
+      //     }
+        
+      //     const cachedOutcome = cachedMarket.outcomes.find(outcome => outcome.name === betDetailData.bet_on.name);
+        
+      //     if (!cachedOutcome) {
+      //       throw new Error(`Outcome for ${betDetailData.bet_on.name} not found in cached data`);
+      //     }
+          
+      //     console.log(cachedOutcome.price, betDetailData.bet_on.odds, "cache ODDS");
+        
+      //     // Compare cached odds with submitted odds
+      //     if (cachedOutcome.price !== betDetailData.bet_on.odds) {
+      //       // Fetch fresh odds before error if mismatch is found
+      //       const freshOddsData = await Store.getEventOdds(
+      //         betDetailData.sport_key,
+      //         betDetailData.event_id,
+      //         betDetailData.category,
+      //         'us',
+      //         'decimal',
+      //         'iso'
+      //       );
+      //       const freshMarket = freshOddsData.bookmakers.find(bookmaker => bookmaker.key === betDetailData.bookmaker)
+      //                                ?.markets.find(market => market.key === betDetailData.category);
       
-      //   // Compare cached odds with submitted odds
-      //   if (cachedOutcome.price !== betDetailData.bet_on.odds) {
-      //     playerSocket.sendData({
-      //       type: "ODDS_MISMATCH",
-      //       message: `Odds for ${betDetailData.bet_on.name} have changed. Please refresh and try again.`
-      //     });
-      //     throw new Error(`Odds for ${betDetailData.bet_on.name} have changed.`);
-      //   }
+      //       const freshOutcome = freshMarket?.outcomes.find(outcome => outcome.name === betDetailData.bet_on.name);
+            
+      //       if (freshOutcome && freshOutcome.price === betDetailData.bet_on.odds) {
+      //         // Update cache with fresh data to avoid errors in future bets
+      //         await redisClient.set(cacheKey, JSON.stringify(freshOddsData), 'EX', 3);
+      //       } else {
+      //         playerSocket.sendData({
+      //           type: "ODDS_MISMATCH",
+      //           message: `Odds for ${betDetailData.bet_on.name} have changed. Please refresh and try again.`
+      //         });
+      //         throw new Error(`Odds for ${betDetailData.bet_on.name} have changed.`);
+      //       }
+      //     }
       // }
       
 
@@ -205,8 +224,7 @@ class BetController {
         betType,
       });
       await bet.save({ session });
-
-      const playerBets = await Bet.find({
+          const playerBets = await Bet.find({
         player: player._id,
       })
         .session(session)
