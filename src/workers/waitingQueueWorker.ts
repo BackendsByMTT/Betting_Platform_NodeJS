@@ -45,17 +45,13 @@ export async function checkBetsCommenceTime() {
         if (!betDetail || !betParent) {
           console.log(`BetDetail or BetParent not found for betId: ${betId}, removing from queue`);
 
-          // Remove the problematic bet from the waiting queue
           await redisClient.zrem('waitingQueue', bet);
-          continue; // Skip further processing for this bet
+          continue; 
         }
 
         const multi = redisClient.multi();
 
-        // Add the entire betDetail data to the processing queue
         multi.lpush('processingQueue', JSON.stringify(betDetail));
-
-        // Remove the bet from the waiting queue
         multi.zrem('waitingQueue', bet)
 
         await multi.exec();
@@ -63,7 +59,6 @@ export async function checkBetsCommenceTime() {
       } catch (error) {
         console.log(`Error processing bet with ID ${betId}:`, error);
 
-        // Remove the problematic bet from the waiting queue if an error occurs
         await redisClient.zrem('waitingQueue', bet);
       }
 
