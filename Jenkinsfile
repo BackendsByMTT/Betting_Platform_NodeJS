@@ -5,10 +5,6 @@ pipeline {
         Token = credentials('GITHUB_TOKEN')  // Fetch GitHub token from Jenkins credentials
     }
 
-    triggers {
-        // Trigger the pipeline whenever there is a push or merge on the 'dev' branch
-        pollSCM('H/1 * * * *')  // Optional: Polls every minute for changes, can be removed if webhooks are configured
-    }
 
     stages {
         stage('Clone Repository') {
@@ -59,7 +55,7 @@ pipeline {
                         git commit -m "Add build"
                         git branch -M dev-build
                         git remote set-url origin https://github.com/BackendsByMTT/Betting_Platform_NodeJS
-                        git push https://${Token}@https://github.com/BackendsByMTT/Betting_Platform_NodeJS dev-build --force
+                        git push https://${Token}@github.com/BackendsByMTT/Betting_Platform_NodeJS dev-build --force
                      else
                         echo 'No changes to commit'
                      fi
