@@ -75,16 +75,20 @@ function checkBetsCommenceTime() {
                     const betParent = yield betModel_1.default.findById(betDetail.key).lean();
                     if (!betDetail || !betParent) {
                         console.log(`BetDetail or BetParent not found for betId: ${betId}, removing from queue`);
+                        // Remove the problematic bet from the waiting queue
                         yield redisclient_1.redisClient.zrem('waitingQueue', bet);
-                        continue;
+                        continue; // Skip further processing for this bet
                     }
                     const multi = redisclient_1.redisClient.multi();
+                    // Add the entire betDetail data to the processing queue
                     multi.lpush('processingQueue', JSON.stringify(betDetail));
+                    // Remove the bet from the waiting queue
                     multi.zrem('waitingQueue', bet);
                     yield multi.exec();
                 }
                 catch (error) {
                     console.log(`Error processing bet with ID ${betId}:`, error);
+                    // Remove the problematic bet from the waiting queue if an error occurs
                     yield redisclient_1.redisClient.zrem('waitingQueue', bet);
                 }
             }
