@@ -227,63 +227,82 @@ class UserActivityController {
 
   async getActivitiesByDate(req: Request, res: Response, next: NextFunction) {
     try {
-      const { date, playerId } = req.query;
-      console.log(date, playerId);
-
+      const { date, playerId, page = 1, limit = 10 } = req.query; 
+  
       if (!date) {
         throw createHttpError(400, "Date query parameter is required");
       }
-
+  
       if (!playerId) {
         throw createHttpError(400, "Player ID query parameter is required");
       }
-
-      // Validate the date format
+  
       const parsedDate = new Date(date as string);
       if (isNaN(parsedDate.getTime())) {
         throw createHttpError(400, "Invalid date format");
       }
-
-
+  
       const playerObjectId = new mongoose.Types.ObjectId(playerId as string);
-
-      // Find activities by date and player
-      const activities = await DailyActivity.findOne({
+  
+      const activities = await DailyActivity.find({
         date: parsedDate,
-        player: playerObjectId // Adjust this if playerId needs to be an ObjectId
+        player: playerObjectId,
       })
+        .skip((Number(page) - 1) * Number(limit)) 
+        .limit(Number(limit)) 
         .populate({
-          path: 'actvity', // Check field name; assumed to be 'activity' based on context
+          path: 'activity', 
         })
         .populate({
           path: 'player',
           model: 'Player'
         });
-      const populatedActivities = activities.actvity;
-
-      return res.status(200).json(populatedActivities);
+  
+      const totalActivities = await DailyActivity.countDocuments({
+        date: parsedDate,
+        player: playerObjectId,
+      });
+  
+      return res.status(200).json({
+        totalActivities,
+        currentPage: Number(page),
+        totalPages: Math.ceil(totalActivities / Number(limit)),
+        activities,
+      });
     } catch (error) {
       console.log(error);
-
       next(error);
     }
   }
-
+  
   async getAllDailyActivitiesOfAPlayer(req: Request, res: Response, next: NextFunction) {
     try {
       const { player } = req.params;
+      const { page = 1, limit = 10 } = req.query; 
+  
       const playerDetails = await Player.findOne({ username: player });
       if (!playerDetails) {
-        throw createHttpError(404, "Player not found")
+        throw createHttpError(404, "Player not found");
       }
+  
+      
       const getDailyActivitiesOfAPlayer = await DailyActivity.find({ player: playerDetails._id })
-      console.log(getDailyActivitiesOfAPlayer, playerDetails._id);
-
-      return res.status(200).json(getDailyActivitiesOfAPlayer);
+        .skip((Number(page) - 1) * Number(limit)) 
+        .limit(Number(limit)); 
+  
+      const totalActivities = await DailyActivity.countDocuments({ player: playerDetails._id });
+  
+      return res.status(200).json({
+        totalActivities,
+        currentPage: Number(page),
+        totalPages: Math.ceil(totalActivities / Number(limit)),
+        activities: getDailyActivitiesOfAPlayer,
+      });
     } catch (error) {
-      next(error)
+      next(error);
     }
   }
+  
 }
 
 export default new UserActivityController()

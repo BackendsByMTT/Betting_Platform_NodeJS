@@ -95,12 +95,25 @@ class PlayerController {
 
   async getAllPlayers(req: Request, res: Response, next: NextFunction) {
     try {
-      const players = await Player.find();
-      res.status(200).json(players);
+      const { page = 1, limit = 10 } = req.query; 
+      const players = await Player.find()
+        .skip((+page - 1) * +limit)
+        .limit(+limit); 
+      const totalPlayers = await Player.countDocuments(); 
+  
+      res.status(200).json({
+        totalPlayers,
+        page: +page,
+        limit: +limit,
+        totalPages: Math.ceil(totalPlayers / +limit),
+        players,
+      });
     } catch (error) {
       next(error);
     }
   }
+  
+  
 
   //UPDATE PLAYER
 
