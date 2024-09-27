@@ -398,21 +398,21 @@ class Store {
 }
 
 public removeInactiveRooms() {
-    const rooms = io.sockets.adapter.rooms;
-    console.log(rooms, "Socket.io Rooms");
+  const rooms = io.sockets.adapter.rooms;
+  console.log(rooms, "Socket.io Rooms");
 
-    const currentRooms = new Set(rooms.keys());
-    console.log(currentRooms, "Currently Active Rooms");
+  const currentRooms = new Set(rooms.keys());
+  console.log(currentRooms, "Currently Active Rooms");
 
-    console.log([...activeRooms], "Initial Active Rooms Set");
+  console.log([...activeRooms], "Initial Active Rooms Set");
 
-    activeRooms.forEach((room) => {
-        if (!currentRooms.has(room)) {
+  activeRooms.forEach((room) => {
+      if (!currentRooms.has(room)) {
             activeRooms.delete(room); // Remove inactive rooms
-        }
-    });
+      }
+  });
 
-    console.log([...activeRooms], "Updated Active Rooms Set");
+  console.log([...activeRooms], "Updated Active Rooms Set");
 
     return activeRooms; // Return the updated set of active rooms
 }
