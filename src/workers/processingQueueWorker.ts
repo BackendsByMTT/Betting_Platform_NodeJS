@@ -240,6 +240,8 @@ class ProcessingQueueWorker {
 
     const anyBetLost = updatedBetDetails.some(detail => detail.status === 'lost');
     const anyBetFailed = updatedBetDetails.some(detail => detail.status === 'failed');
+    const anyBetDrawn = updatedBetDetails.some(detail => detail.status === 'draw');
+    const betOnDrawn = updatedBetDetails.every(detail => detail.bet_on.name === 'draw');
 
     if (anyBetLost) {
       await Bet.findByIdAndUpdate(parentBet._id, { status: 'lost', isResolved: true });
@@ -268,8 +270,21 @@ class ProcessingQueueWorker {
       );
       return;
     }
-
+    if(anyBetDrawn && !betOnDrawn){
+      await Bet.findByIdAndUpdate(parentBet._id, { status: 'lost', isResolved: true });
+      await this.publishRedisNotification(
+        "BET_LOST",
+        player._id.toString(),
+        player.username,
+        agentId,
+        parentBet._id.toString(),
+        `Unfortunately, you lost your bet (ID: ${parentBet._id}). Better luck next time!`,
+        `A player's bet (ID: ${parentBet._id}) has lost. Please review the details.`
+      );
+      return;
+    }
     const allBetsWon = updatedBetDetails.every(detail => detail.status === 'won');
+    const allBetsDrawn = updatedBetDetails.every(detail => detail.status === 'draw');
 
     if (allBetsWon) {
       await Bet.findByIdAndUpdate(parentBet._id, { status: 'won', isResolved: true });
@@ -283,9 +298,22 @@ class ProcessingQueueWorker {
         `Congratulations! Bet with ID ${parentBet._id} has won. You have been awarded $${parentBet.possibleWinningAmount}.`,
         `Player ${player.username} has won the bet with ID ${parentBet._id}, and the winnings of $${parentBet.possibleWinningAmount} have been awarded.`
       );
-    } else {
-      await Bet.findByIdAndUpdate(parentBet._id, { isResolved: true });
-      console.log(`Parent Bet with ID ${parentBet._id} has been resolved.`);
+    }else if(allBetsDrawn && betOnDrawn){
+      await Bet.findByIdAndUpdate(parentBet._id, { status: 'draw', isResolved: true });
+      await this.awardWinningsToPlayer(parentBet.player, parentBet.possibleWinningAmount);
+      await this.publishRedisNotification(
+        "BET_DRAWN",
+        player._id.toString(),
+        player.username,
+        agentId,
+        parentBet._id.toString(),
+        `Congratulations! Bet with ID ${parentBet._id} has drawn. You have been awarded $${parentBet.possibleWinningAmount}.`,
+        `Player ${player.username} has won the bet with ID ${parentBet._id}, and the winnings of $${parentBet.possibleWinningAmount} have been awarded.`
+      );
+    }
+     else {
+      await Bet.findByIdAndUpdate(parentBet._id, { isResolved: false });
+      console.log(`Parent Bet with ID ${parentBet._id} has not been resolved.`);
     }
   }
 
@@ -329,9 +357,9 @@ class ProcessingQueueWorker {
     }
 
     if (homeTeamScore === awayTeamScore) {
-      return "draw";
+      return betOnTeam === "draw" ? "won" : "draw";
     }
-
+  
     const gameWinner = homeTeamScore > awayTeamScore ? homeTeamName : awayTeamName;
     return betOnTeam === gameWinner ? "won" : "lost";
   }
