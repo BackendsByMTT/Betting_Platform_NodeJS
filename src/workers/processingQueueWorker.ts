@@ -407,23 +407,20 @@ class ProcessingQueueWorker {
       return "failed";
     }
 
-    // Calculate the total score for the game
     const totalScore = homeTeamScore + awayTeamScore;
 
-    // Edge Case: Exact total matches the total line, this is considered a "push" (draw)
     if (totalScore === totalLine) {
       console.log("The total score equals the total line. It's a push (draw).");
-      return "draw"; // This would result in a push or draw
+      return "draw"; 
     }
 
-    // Determine if the user bet on Over or Under and return the appropriate result
     if (betOn === "Over") {
       return totalScore > totalLine ? "won" : "lost";
     } else if (betOn === "Under") {
       return totalScore < totalLine ? "won" : "lost";
     }
 
-    return "pending";  // Fallback case, should not reach here
+    return "pending";  
   }
 
   async publishRedisNotification(type: string, playerId: string, username: string, agentId: string, betId: string, playerMessage: string, agentMessage: string): Promise<void> {
