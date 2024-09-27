@@ -408,18 +408,13 @@ public removeInactiveRooms() {
 
   activeRooms.forEach((room) => {
       if (!currentRooms.has(room)) {
-          const clientsInRoom = rooms.get(room)?.size || 0;
-          console.log(`Room: ${room}, Clients: ${clientsInRoom}`);
-
-          if (clientsInRoom === 0) {
-              activeRooms.delete(room);
-          }
+            activeRooms.delete(room); // Remove inactive rooms
       }
   });
 
   console.log([...activeRooms], "Updated Active Rooms Set");
 
-  return activeRooms; 
+    return activeRooms; // Return the updated set of active rooms
 }
 
 }
