@@ -116,7 +116,7 @@ async function getLatestOddsForAllEvents() {
 
 
 async function migrateAllBetsFromWaitingQueue() {
-  const bets = await redisClient.zrange('waitingQueue', 0, -1); 
+  const bets = await redisClient.zrange('waitingQueue', 0, -1);
 
   for (const bet of bets) {
     const data = JSON.parse(bet);
@@ -126,19 +126,19 @@ async function migrateAllBetsFromWaitingQueue() {
 
       if (!betDetail) {
         console.log(`BetDetail not found for betId: ${betId}, skipping this bet.`);
-        continue; 
+        continue;
       }
 
       if (!betDetail.key) {
         console.log(`BetDetail with ID ${betId} is missing the 'key' field, skipping.`);
-        continue; 
+        continue;
       }
 
       const betParent = await Bet.findById(betDetail.key).lean();
 
       if (!betParent) {
         console.log(`Parent Bet not found for betId: ${betId}, skipping.`);
-        continue; 
+        continue;
       }
 
       await migrateLegacyBet(betDetail);
@@ -150,7 +150,7 @@ async function migrateAllBetsFromWaitingQueue() {
 }
 
 async function migrateLegacyResolvedBets() {
-  const bets = await BetDetail.find({ isResolved: true, status: { $ne: 'pending' } }).lean();
+  const bets = await BetDetail.find({ status: { $ne: 'pending' } }).lean();
   for (const bet of bets) {
     try {
       await migrateLegacyBet(bet);
