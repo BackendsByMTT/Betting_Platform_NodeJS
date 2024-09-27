@@ -367,61 +367,56 @@ class Store {
   }
     
   public async updateLiveData() {
-    console.log(activeRooms.values(), "AcTiVe");
-    
-    const currentActive =this.removeInactiveRooms();
-    // console.log("currentActive", currentActive);
+    console.log([...activeRooms], "Active Rooms");
+
+    const currentActive = this.removeInactiveRooms();
 
     for (const sport of currentActive) {
-      const liveData = await this.getOdds(sport);
-      // console.log("livedata", liveData);
+        const liveData = await this.getOdds(sport) || {};
 
-      const liveGamesForSport = liveData.live_games;
-      const todaysUpcomingGamesForSport = liveData.todays_upcoming_games;
-      const futureUpcomingGamesForSport = liveData.future_upcoming_games;
-      // const liveGamesForSport = livedata.live_games.filter(
-      //   (game: any) => game.sport_key === sport
-      // );
-      // const todaysUpcomingGamesForSport = livedata.todays_upcoming_games.filter(
-      //   (game: any) => game.sport_key === sport
-      // );
-      // const futureUpcomingGamesForSport = livedata.future_upcoming_games.filter(
-      //   (game: any) => game.sport_key === sport
-      // );
-
-      // Check if there's any data for the current sport before emitting
-      if (
-        liveGamesForSport.length > 0 ||
-        todaysUpcomingGamesForSport.length > 0 ||
-        futureUpcomingGamesForSport.length > 0
-      ) {
-        io.to(sport).emit("data", {
-          type: "ODDS",
-          data: {
-            live_games: liveGamesForSport,
-            todays_upcoming_games: todaysUpcomingGamesForSport,
-            future_upcoming_games: futureUpcomingGamesForSport,
-          },
-        });
-        console.log(`Data broadcasted to room: ${sport}`);
-      } else {
-        console.log(`No relevant data available for sport: ${sport}`);
-      }
+        const liveGamesForSport = liveData.live_games|| {};
+        const todaysUpcomingGamesForSport = liveData.todays_upcoming_games || {};
+        const futureUpcomingGamesForSport = liveData.future_upcoming_games || {};         
+        if (
+            liveGamesForSport.length > 0 ||
+            todaysUpcomingGamesForSport.length > 0 ||
+            futureUpcomingGamesForSport.length > 0
+        ) {
+            io.to(sport).emit("data", {
+                type: "ODDS",
+                data: {
+                    live_games: liveGamesForSport,
+                    todays_upcoming_games: todaysUpcomingGamesForSport,
+                    future_upcoming_games: futureUpcomingGamesForSport,
+                },
+            });
+            console.log(`Data broadcasted to room: ${sport}`);
+        } else {
+            console.log(`No relevant data available for sport: ${sport}`);
+        }
     }
-  }
-  public removeInactiveRooms() {
+}
+
+public removeInactiveRooms() {
     const rooms = io.sockets.adapter.rooms;
+    console.log(rooms, "Socket.io Rooms");
 
     const currentRooms = new Set(rooms.keys());
+    console.log(currentRooms, "Currently Active Rooms");
+
+    console.log([...activeRooms], "Initial Active Rooms Set");
 
     activeRooms.forEach((room) => {
-      if (!currentRooms.has(room)) {
-        activeRooms.delete(room);
-      }
+        if (!currentRooms.has(room)) {
+            activeRooms.delete(room); // Remove inactive rooms
+        }
     });
 
-    return activeRooms;
-  }
+    console.log([...activeRooms], "Updated Active Rooms Set");
+
+    return activeRooms; // Return the updated set of active rooms
+}
+
 }
 
 export default new Store();
