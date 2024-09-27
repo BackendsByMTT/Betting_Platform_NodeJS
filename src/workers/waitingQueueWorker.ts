@@ -46,7 +46,7 @@ export async function checkBetsCommenceTime() {
           console.log(`BetDetail or BetParent not found for betId: ${betId}, removing from queue`);
 
           await redisClient.zrem('waitingQueue', bet);
-          continue; 
+          continue;
         }
 
         const multi = redisClient.multi();
@@ -155,6 +155,36 @@ async function migrateLegacyResolvedBets() {
   }
 }
 
+async function migrateLegacyPendingBets() {
+  try {
+    // Get all the bets in the waiting queue in one go
+    const queueBets = await redisClient.zrange('waitingQueue', 0, -1);
+
+    // Extract bet IDs and store them in a Set for quick lookup
+    const waitingQueueBetIds = new Set(queueBets.map(bet => JSON.parse(bet).betId));
+
+    // Find bets with status 'pending' and isResolved as false
+    const pendingBets = await BetDetail.find({ status: 'pending', isResolved: false }).lean();
+
+    for (const bet of pendingBets) {
+      try {
+        // Check if the bet is in the waiting queue
+        if (waitingQueueBetIds.has(bet._id.toString())) {
+          console.log(`Bet with ID ${bet._id} is in the waiting queue, skipping migration.`);
+          continue; // Skip this bet if it's in the waiting queue
+        }
+
+        // If not in the queue, migrate the bet
+        await migrateLegacyBet(bet);
+
+      } catch (error) {
+        console.log(`Error migrating pending bet with ID ${bet._id}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error("Error during migration of legacy pending bets:", error);
+  }
+}
 
 
 async function startWorker() {
@@ -163,6 +193,7 @@ async function startWorker() {
     try {
       await migrateAllBetsFromWaitingQueue();
       await migrateLegacyResolvedBets();
+      await migrateLegacyPendingBets();
       await checkBetsCommenceTime();
       await getLatestOddsForAllEvents();
     } catch (error) {
