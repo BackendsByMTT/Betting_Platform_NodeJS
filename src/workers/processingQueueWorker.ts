@@ -181,7 +181,9 @@ class ProcessingQueueWorker {
           case "totals":
             result = this.checkTotalsBetResult(currentBetDetail, gameData);
             break;
-
+          case "outrights":
+            result = this.checkOutrightsBetResult(currentBetDetail, gameData);
+            break;
           default:
             console.error(`Unknown bet category: ${currentBetDetail.category}`);
             return;
@@ -453,6 +455,44 @@ class ProcessingQueueWorker {
 
     return "pending";  // Fallback case, should not reach here
   }
+
+  checkOutrightsBetResult(betDetail: IBetDetail, gameData: any): "won" | "lost" | "draw" | "pending" | "failed" {
+    const betOn = betDetail.bet_on.name;
+  
+    if (!gameData.completed) {
+      return "pending";
+    }
+  
+    const betOnTeam = gameData.scores.find((team: any) => team.name === betOn);
+  
+    if (!betOnTeam) {
+      return "failed";
+    }
+  
+    const betOnTeamScore = betOnTeam.score;
+  
+    if (betOnTeamScore == null || betOnTeamScore < 0) {
+      console.error("Error: Invalid scores found (negative values or not defined).");
+      return "failed";
+    }
+  
+    const allScores = gameData.scores.map((team: any) => team.score);
+    const maxScore = Math.max(...allScores);
+    const teamsWithMaxScore = gameData.scores.filter((team: any) => team.score === maxScore);
+  
+    if (teamsWithMaxScore.length > 1) {
+      return "draw";
+    }
+  
+    if (teamsWithMaxScore[0].name === betOn) {
+      return "won";
+    } else {
+      return "lost";
+    }
+  
+    return "pending";
+  }
+  
 
   async publishRedisNotification(type: string, playerId: string, username: string, agentId: string, betId: string, playerMessage: string, agentMessage: string): Promise<void> {
     try {
