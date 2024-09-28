@@ -284,7 +284,7 @@ class SubordinateController {
         page: +page,
         limit: +limit,
         totalPages: Math.ceil(totalSubordinates / +limit),
-        results,
+        data:results,
       });
     } catch (error) {
       console.log(error);
@@ -508,7 +508,7 @@ class SubordinateController {
         page: +page,
         limit: +limit,
         totalPages: Math.ceil(totalSubordinates / +limit),
-        subordinates: paginatedSubordinates,
+        data: paginatedSubordinates,
       });
     } catch (error) {
       console.log(error);

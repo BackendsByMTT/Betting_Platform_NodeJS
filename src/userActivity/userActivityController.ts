@@ -267,7 +267,7 @@ class UserActivityController {
         totalActivities,
         currentPage: Number(page),
         totalPages: Math.ceil(totalActivities / Number(limit)),
-        activities,
+        data:activities,
       });
     } catch (error) {
       console.log(error);
@@ -296,7 +296,7 @@ class UserActivityController {
         totalActivities,
         currentPage: Number(page),
         totalPages: Math.ceil(totalActivities / Number(limit)),
-        activities: getDailyActivitiesOfAPlayer,
+        data: getDailyActivitiesOfAPlayer,
       });
     } catch (error) {
       next(error);

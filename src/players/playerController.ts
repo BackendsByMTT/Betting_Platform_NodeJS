@@ -106,7 +106,7 @@ class PlayerController {
         page: +page,
         limit: +limit,
         totalPages: Math.ceil(totalPlayers / +limit),
-        players,
+        data:players,
       });
     } catch (error) {
       next(error);

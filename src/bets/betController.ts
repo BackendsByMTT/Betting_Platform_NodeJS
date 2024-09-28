@@ -363,7 +363,7 @@ class BetController {
         page: +page,
         limit: +limit,
         totalPages: Math.ceil(totalBets / +limit),
-        bets,
+        data:bets,
       });
     } catch (error) {
       next(error);
@@ -404,7 +404,7 @@ class BetController {
         page: +page,
         limit: +limit,
         totalPages: Math.ceil(totalBets / +limit),
-        bets,
+        data:bets,
       });
     } catch (error) {
       console.log(error);
@@ -471,7 +471,7 @@ class BetController {
         page: +page,
         limit: +limit,
         totalPages: Math.ceil(totalBets / +limit),
-        playerBets,
+        data:playerBets,
       });
     } catch (error) {
       console.log(error);

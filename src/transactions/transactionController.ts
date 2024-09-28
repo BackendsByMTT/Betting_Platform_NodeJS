@@ -226,7 +226,7 @@ class TransactionController {
         page: +page,
         limit: +limit,
         totalPages: Math.ceil(totalTransactions / +limit),
-        transactions: allTransactions,
+        data: allTransactions,
       });
     } catch (error) {
       console.log(error);
@@ -278,7 +278,7 @@ class TransactionController {
         totalTransactions,
         currentPage: pageNumber,
         totalPages: Math.ceil(totalTransactions / limitNumber),
-        transactions: transactionsOfAgent,
+        data: transactionsOfAgent,
       });
     } catch (error) {
       next(error);
@@ -477,7 +477,7 @@ class TransactionController {
         totalTransactions,
         currentPage: Number(page),
         totalPages: Math.ceil(totalTransactions / Number(limit)),
-        transactions,
+        data:transactions,
       });
     } catch (error) {
       console.log(error);
@@ -711,7 +711,7 @@ class TransactionController {
         totalTransactions: totalTransactions.length > 0 ? totalTransactions[0].count : 0,
         currentPage: Number(page),
         totalPages: Math.ceil((totalTransactions.length > 0 ? totalTransactions[0].count : 0) / Number(limit)),
-        transactions: playerTransactions,
+        data: playerTransactions,
       });
     } catch (error) {
       console.log(error);
