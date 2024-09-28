@@ -243,7 +243,7 @@ class ProcessingQueueWorker {
     const anyBetLost = updatedBetDetails.some(detail => detail.status === 'lost');
     const anyBetFailed = updatedBetDetails.some(detail => detail.status === 'failed');
     const anyBetDrawn = updatedBetDetails.some(detail => detail.status === 'draw');
-    const betOnDrawn = updatedBetDetails.every(detail => detail.bet_on.name === 'draw');
+    const betOnDrawn = updatedBetDetails.every(detail => detail.bet_on.name === 'Draw');
 
     if (anyBetLost) {
       await Bet.findByIdAndUpdate(parentBet._id, { status: 'lost', isResolved: true });
@@ -481,7 +481,12 @@ class ProcessingQueueWorker {
     const teamsWithMaxScore = gameData.scores.filter((team: any) => team.score === maxScore);
   
     if (teamsWithMaxScore.length > 1) {
-      return "draw";
+      const isBetOnTeamInDraw = teamsWithMaxScore.some((team: any) => team.name === betOn);      
+      if (isBetOnTeamInDraw) {
+        return "draw";
+      } else {
+        return "lost";
+      }
     }
   
     if (teamsWithMaxScore[0].name === betOn) {
