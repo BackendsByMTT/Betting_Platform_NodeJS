@@ -120,15 +120,18 @@ class PlayerController {
   async updatePlayer(req: Request, res: Response, next: NextFunction) {
     const { username, password, status } = req.body;
     const { id: playerId } = req.params;
-
+  
     try {
       const _req = req as AuthRequest;
       const { userId, role } = _req.user;
-
+  
       const sanitizedUsername = username ? sanitizeInput(username) : undefined;
-      const sanitizedPassword = password ? sanitizeInput(password) : undefined;
+      const sanitizedPassword = password && password.trim() !== '' 
+        ? sanitizeInput(password) 
+        : undefined;
       const sanitizedStatus = status ? sanitizeInput(status) : undefined;
-
+  
+      // Prepare the update data, only including password if it's provided and non-empty
       const updateData: Partial<IPlayer> = {
         ...(sanitizedUsername && { username: sanitizedUsername }),
         ...(sanitizedPassword && {
@@ -139,26 +142,25 @@ class PlayerController {
         }),
         ...(sanitizedStatus && { status: sanitizedStatus }),
       };
-
+  
       if (role === "agent") {
         const agent = await User.findById(userId);
-
         if (!agent) {
           throw createHttpError(404, "Agent not found");
         }
-
+  
         const playerExistsInAgent = agent.players.some(
           (player: mongoose.Schema.Types.ObjectId) =>
             player.toString() === playerId
         );
-
+  
         if (!playerExistsInAgent) {
           throw createHttpError(
             401,
             "You are not authorized to update this player"
           );
         }
-
+  
         const player = await Player.findById(playerId);
         if (!player) {
           throw createHttpError(404, "Player not found");
@@ -174,7 +176,7 @@ class PlayerController {
           "You do not have permission to update players"
         );
       }
-
+  
       const updatedPlayer = await Player.findByIdAndUpdate(
         playerId,
         updateData,
@@ -182,21 +184,25 @@ class PlayerController {
           new: true,
         }
       );
-
+  
       if (!updatedPlayer) {
         throw createHttpError(404, "Player not found");
       }
-
+  
+      // Notify player via socket if their status is updated
       const playerSocket = users.get(updatedPlayer?.username);
       if (playerSocket) {
-        playerSocket.sendMessage({ type: "STATUS", payload: updatedPlayer.status === "active" ? true : false, message: "" });
+        playerSocket.sendMessage({
+          type: "STATUS",
+          payload: updatedPlayer.status === "active" ? true : false,
+          message: "",
+        });
       }
+  
       res.status(200).json({
         message: "Player updated successfully",
         player: updatedPlayer,
       });
-
-
     } catch (error) {
       next(error);
     }
