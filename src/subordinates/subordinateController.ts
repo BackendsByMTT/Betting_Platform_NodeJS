@@ -166,15 +166,15 @@ class SubordinateController {
 
   async getAllSubordinates(req: Request, res: Response, next: NextFunction) {
     try {
-      const { type, search, date } = req.query;
+      const { type, search, date, page = 1, limit = 10 } = req.query; // Default to page 1 and limit 10
       const _req = req as AuthRequest;
       const { userId } = _req.user;
-
+  
       const admin = await User.findById(userId);
       if (!admin) throw createHttpError(401, "You are Not Authorized");
-
+  
       let pipeline: any[] = [];
-
+  
       if (type === "all") {
         pipeline.push({
           $unionWith: {
@@ -225,7 +225,7 @@ class SubordinateController {
           $match: { role: type },
         });
       }
-
+  
       if (search) {
         pipeline.push({
           $match: {
@@ -233,6 +233,7 @@ class SubordinateController {
           },
         });
       }
+  
       if (date) {
         const filterDate = new Date(date as string);
         pipeline.push({
@@ -244,6 +245,7 @@ class SubordinateController {
           },
         });
       }
+  
       pipeline.push({
         $group: {
           _id: "$_id",
@@ -254,15 +256,42 @@ class SubordinateController {
           createdAt: { $first: "$createdAt" },
         },
       });
+  
+      // Add sorting
+      pipeline.push({
+        $sort: { createdAt: -1 },
+      });
+  
+      // Add pagination (skip and limit)
+      pipeline.push(
+        { $skip: (+page - 1) * +limit },
+        { $limit: +limit }
+      );
+  
       // Perform aggregation
-      const results = await User.aggregate(pipeline).sort({ createdAt: -1 });
-
-      res.status(200).json(results);
+      const results = await User.aggregate(pipeline);
+  
+      // Get the total count without pagination for calculating total pages
+      const totalResults = await User.aggregate([
+        ...pipeline.slice(0, -2), // Run the same pipeline without skip and limit to get total count
+        { $count: "total" },
+      ]);
+  
+      const totalSubordinates = totalResults.length ? totalResults[0].total : 0;
+  
+      res.status(200).json({
+        totalSubordinates,
+        page: +page,
+        limit: +limit,
+        totalPages: Math.ceil(totalSubordinates / +limit),
+        data:results,
+      });
     } catch (error) {
       console.log(error);
       next(error);
     }
   }
+  
 
   //UPDATE USER (SUBORDINATES)
 
@@ -369,17 +398,17 @@ class SubordinateController {
   ) {
     try {
       const { superior } = req.params;
-      const { type, search, date } = req.query;
-
+      const { type, search, date, page = 1, limit = 10 } = req.query; // Default to page 1 and limit 10
+  
       const _req = req as AuthRequest;
       const { userId } = _req.user;
-
+  
       let requestingUser = await User.findById(userId);
       let subordinatesofRequestingUser = requestingUser.subordinates || [];
       let players = requestingUser.players || [];
       let superiorUser: any;
-
-      // GETTING SUBORDINATE BASED ON QUERY TYPE(username, id)
+  
+      // GETTING SUBORDINATE BASED ON QUERY TYPE (username, id)
       if (type === "id") {
         superiorUser = await User.findById(superior).select(
           "-password -transactions"
@@ -387,19 +416,16 @@ class SubordinateController {
         if (!superiorUser) {
           throw createHttpError(404, "Superior user not found");
         }
-
+  
         if (
           requestingUser.role !== "admin" &&
           requestingUser?._id?.toString() !== superior &&
           !subordinatesofRequestingUser.includes(superiorUser._id) &&
           !players.includes(superiorUser._id)
         ) {
-          console.log("here", subordinatesofRequestingUser, superiorUser._id);
           throw createHttpError(401, "Not Authorised");
         }
-
-        //PLAYERS FOR AGENT(AGENT HAS PLAYERS AS SUBORDINATE)
-
+  
         if (superiorUser.role === "agent") {
           superiorUser = await User.findById(superior).populate({
             path: "players",
@@ -411,6 +437,7 @@ class SubordinateController {
             select: "-password",
           });
         }
+  
         if (!superiorUser) throw createHttpError(404, "User Not Found");
       } else if (type === "username") {
         superiorUser = await User.findOne({ username: superior }).select(
@@ -419,46 +446,45 @@ class SubordinateController {
         if (!superiorUser) {
           throw createHttpError(404, "Superior user not found");
         }
-
+  
         if (
           requestingUser.role !== "admin" &&
           requestingUser?.username !== superior &&
           !subordinatesofRequestingUser.includes(superiorUser._id) &&
           !players.includes(superiorUser._id)
         ) {
-          console.log("here", subordinatesofRequestingUser, superiorUser._id);
           throw createHttpError(401, "Not Authorised");
         }
-
+  
         superiorUser = await User.findOne({ username: superior }).populate({
           path: "subordinates players",
           select: "-password",
         });
-
-        if (!superiorUser)
-          throw createHttpError(
-            404,
-            "User Not Found with the provided username"
-          );
+  
+        if (!superiorUser) {
+          throw createHttpError(404, "User Not Found with the provided username");
+        }
       } else {
-        throw createHttpError(400, "Usr Id or Username not provided");
+        throw createHttpError(400, "User Id or Username not provided");
       }
-
-      // ACCESS SUBORDINATE DEPENDING ON ROLE
-
+  
+      // ACCESS SUBORDINATES DEPENDING ON ROLE
       let subordinates =
         superiorUser.role === "admin"
           ? [...superiorUser.subordinates, ...superiorUser.players]
           : superiorUser.role === "agent"
           ? superiorUser.players
           : superiorUser.subordinates;
-
+  
+      // Search filter
       if (search) {
-        const regex = new RegExp(search as string, "i"); // 'i' for case-insensitive matching
+        const regex = new RegExp(search as string, "i"); // Case-insensitive search
         subordinates = subordinates.filter((subordinate: any) =>
           regex.test(subordinate.username)
         );
       }
+  
+      // Date filter
       if (date) {
         const filterDate = new Date(date as string);
         filterDate.setHours(0, 0, 0, 0);
@@ -469,14 +495,27 @@ class SubordinateController {
           return createdAt >= filterDate && createdAt < nextDay;
         });
       }
-
-      return res.status(200).json(subordinates);
+  
+      // Pagination logic
+      const totalSubordinates = subordinates.length;
+      const paginatedSubordinates = subordinates.slice(
+        (+page - 1) * +limit,
+        +page * +limit
+      );
+  
+      return res.status(200).json({
+        totalSubordinates,
+        page: +page,
+        limit: +limit,
+        totalPages: Math.ceil(totalSubordinates / +limit),
+        data: paginatedSubordinates,
+      });
     } catch (error) {
       console.log(error);
-
       next(error);
     }
   }
+  
 }
 
 export default new SubordinateController();

@@ -6,6 +6,7 @@ import Player from "../players/playerModel";
 import { TransactionService } from "./transactionService";
 import mongoose from "mongoose";
 import Transaction from "./transactionModel";
+import { CustomAggregationStage } from "./transactionType";
 
 class TransactionController {
   // TO RECORD TRANSACTIONS, RECHARGE AND REDEEM
@@ -79,11 +80,11 @@ class TransactionController {
 
   async getAllTransactions(req: Request, res: Response, next: NextFunction) {
     try {
-      const { search, date } = req.query;
-
+      const { search, date, page = 1, limit = 10 } = req.query; 
+  
       // Initial match conditions
       const matchConditions: Record<string, any>[] = [];
-
+  
       // Add search filters
       if (search) {
         if (!isNaN(Number(search))) {
@@ -101,6 +102,7 @@ class TransactionController {
           });
         }
       }
+  
       if (date) {
         const dateRange = new Date(date as string);
         matchConditions.push({
@@ -110,8 +112,8 @@ class TransactionController {
           },
         });
       }
-
-      const pipeline = [
+  
+      const pipeline: CustomAggregationStage[] = [
         {
           $lookup: {
             from: "users",
@@ -192,17 +194,46 @@ class TransactionController {
             date: 1,
           },
         },
+        {
+          $sort: { date: -1 }, // Sort by date in descending order
+        },
       ];
-
-      const allTransactions = await Transaction.aggregate(pipeline).sort({
-        date: -1,
+  
+      // Pagination logic
+      const skip = (+page - 1) * +limit;
+      pipeline.push(
+        { $skip: skip },
+        { $limit: +limit }
+      );
+  
+      // Get total count of documents
+      const totalTransactionsPipeline = [
+        ...(matchConditions.length > 0
+          ? [{ $match: { $and: matchConditions } }]
+          : []),
+        {
+          $count: "total",
+        },
+      ];
+  
+      const totalTransactionsResult = await Transaction.aggregate(totalTransactionsPipeline);
+      const totalTransactions = totalTransactionsResult[0]?.total || 0;
+  
+      const allTransactions = await Transaction.aggregate(pipeline as any);
+  
+      res.status(200).json({
+        totalTransactions,
+        page: +page,
+        limit: +limit,
+        totalPages: Math.ceil(totalTransactions / +limit),
+        data: allTransactions,
       });
-      res.status(200).json(allTransactions);
     } catch (error) {
       console.log(error);
       next(error);
     }
   }
+  
 
   //SPECIFIC USER TRANSACTIONS
 
@@ -213,8 +244,15 @@ class TransactionController {
   ) {
     try {
       const { userId } = req.params;
-
+      const { page = 1, limit = 10 } = req.query; // Default to page 1 and limit 10
+  
       if (!userId) throw createHttpError(400, "User Id not Found");
+  
+      // Convert page and limit to numbers
+      const pageNumber = Number(page);
+      const limitNumber = Number(limit);
+  
+      // Find transactions for the specified user
       const transactionsOfAgent = await Transaction.find({
         $or: [{ sender: userId }, { receiver: userId }],
       })
@@ -226,14 +264,27 @@ class TransactionController {
         .populate({
           path: "receiver",
           select: "-password",
-        });
-
-      res.status(200).json(transactionsOfAgent);
+        })
+        .skip((pageNumber - 1) * limitNumber) // Pagination skip
+        .limit(limitNumber); // Pagination limit
+  
+      // Count total transactions for pagination metadata
+      const totalTransactions = await Transaction.countDocuments({
+        $or: [{ sender: userId }, { receiver: userId }],
+      });
+  
+      // Response with pagination details
+      res.status(200).json({
+        totalTransactions,
+        currentPage: pageNumber,
+        totalPages: Math.ceil(totalTransactions / limitNumber),
+        data: transactionsOfAgent,
+      });
     } catch (error) {
       next(error);
     }
   }
-
+  
   // //SUPERIOR AND HIS SUBORDINATE TRANSACTIONS
   async getSuperiorSubordinateTransaction(
     req: Request,
@@ -242,10 +293,10 @@ class TransactionController {
   ) {
     try {
       const { superior } = req.params;
-      const { type, search, date } = req.query;
-
+      const { type, search, date, page = 1, limit = 10 } = req.query;
+  
       let superiorUser: any;
-
+  
       // Fetching superior user based on type (id or username)
       if (type === "id") {
         superiorUser = await User.findById(superior).select(
@@ -258,9 +309,9 @@ class TransactionController {
       } else {
         throw createHttpError(400, "User Id or Username not provided");
       }
-
+  
       if (!superiorUser) throw createHttpError(404, "User Not Found");
-
+  
       const subordinateIds =
         superiorUser.role === "admin"
           ? [
@@ -270,7 +321,7 @@ class TransactionController {
           : superiorUser.role === "agent"
           ? superiorUser.players.map((player) => player._id)
           : superiorUser.subordinates.map((sub) => sub._id);
-
+  
       const matchConditions: Record<string, any>[] = [
         {
           $or: [
@@ -281,7 +332,8 @@ class TransactionController {
           ],
         },
       ];
-
+  
+      // Add search filters
       if (search) {
         if (!isNaN(Number(search))) {
           matchConditions.push({ amount: Number(search) });
@@ -298,7 +350,8 @@ class TransactionController {
           });
         }
       }
-
+  
+      // Add date filter
       if (date) {
         const dateRange = new Date(date as string);
         matchConditions.push({
@@ -308,8 +361,9 @@ class TransactionController {
           },
         });
       }
-
-      const pipeline = [
+  
+      // Base aggregation pipeline
+      const pipeline: CustomAggregationStage[]  = [
         {
           $lookup: {
             from: "users",
@@ -390,18 +444,47 @@ class TransactionController {
             date: 1,
           },
         },
+        {
+          $sort: { date: -1 }, // Sort by date in descending order
+        },
       ];
-
-      const transactions = await Transaction.aggregate(pipeline).sort({
-        date: -1,
+  
+      // Pagination logic: skip and limit
+      const skip = (Number(page) - 1) * Number(limit);
+      pipeline.push(
+        { $skip: skip },
+        { $limit: Number(limit) }
+      );
+  
+      // Total count of transactions without pagination
+      const totalPipeline = [
+        ...(matchConditions.length > 0
+          ? [{ $match: { $and: matchConditions } }]
+          : []),
+        {
+          $count: "total",
+        },
+      ];
+  
+      const totalTransactionsResult = await Transaction.aggregate(totalPipeline);
+      const totalTransactions = totalTransactionsResult[0]?.total || 0;
+  
+      // Fetch paginated transactions
+      const transactions = await Transaction.aggregate(pipeline as any);
+  
+      // Response with pagination details
+      res.status(200).json({
+        totalTransactions,
+        currentPage: Number(page),
+        totalPages: Math.ceil(totalTransactions / Number(limit)),
+        data:transactions,
       });
-
-      res.status(200).json(transactions);
     } catch (error) {
       console.log(error);
       next(error);
     }
   }
+  
 
   // async getSuperiorSubordinateTransaction(req: Request, res: Response, next: NextFunction) {
 
@@ -486,30 +569,25 @@ class TransactionController {
   ) {
     try {
       const { player } = req.params;
-      const { type, search, date } = req.query;
-
+      const { type, search, date, page = 1, limit = 10 } = req.query; 
+  
       let playerData: any;
-
+  
       if (type === "id") {
         playerData = await Player.findById(player);
         if (!playerData) throw createHttpError(404, "Player Not Found");
       } else if (type === "username") {
         playerData = await Player.findOne({ username: player });
         if (!playerData)
-          throw createHttpError(
-            404,
-            "Player Not Found with the provided username"
-          );
+          throw createHttpError(404, "Player Not Found with the provided username");
       } else {
-        throw createHttpError(
-          400,
-          'Invalid type provided. Use "id" or "username".'
-        );
+        throw createHttpError(400, 'Invalid type provided. Use "id" or "username".');
       }
+  
       const matchConditions: Record<string, any>[] = [
         { $or: [{ receiver: playerData._id }, { sender: playerData._id }] },
       ];
-
+  
       if (search) {
         if (!isNaN(Number(search))) {
           matchConditions.push({ amount: Number(search) });
@@ -526,7 +604,7 @@ class TransactionController {
           });
         }
       }
-
+  
       if (date) {
         const dateRange = new Date(date as string);
         matchConditions.push({
@@ -536,7 +614,7 @@ class TransactionController {
           },
         });
       }
-
+  
       const pipeline: any[] = [
         {
           $lookup: {
@@ -570,9 +648,7 @@ class TransactionController {
             as: "receiverPlayer",
           },
         },
-        ...(matchConditions.length > 0
-          ? [{ $match: { $and: matchConditions } }]
-          : []),
+        ...(matchConditions.length > 0 ? [{ $match: { $and: matchConditions } }] : []),
         {
           $unwind: {
             path: "$senderUser",
@@ -620,29 +696,29 @@ class TransactionController {
           },
         },
       ];
-
-      const playerTransactions = await Transaction.aggregate(pipeline).sort({
-        date: -1,
+  
+      const totalTransactions = await Transaction.aggregate([
+        ...(matchConditions.length > 0 ? [{ $match: { $and: matchConditions } }] : []),
+        { $count: "count" },
+      ]);
+  
+      const playerTransactions = await Transaction.aggregate(pipeline)
+        .sort({ date: -1 })
+        .skip((Number(page) - 1) * Number(limit)) 
+        .limit(Number(limit));
+  
+      res.status(200).json({
+        totalTransactions: totalTransactions.length > 0 ? totalTransactions[0].count : 0,
+        currentPage: Number(page),
+        totalPages: Math.ceil((totalTransactions.length > 0 ? totalTransactions[0].count : 0) / Number(limit)),
+        data: playerTransactions,
       });
-
-      // Map transactions to the desired format
-      const formattedTransactions = playerTransactions.map(
-        (transaction: any) => ({
-          _id: transaction._id,
-          type: transaction.type,
-          amount: transaction.amount,
-          date: transaction.date,
-          sender: transaction.sender,
-          receiver: transaction.receiver,
-        })
-      );
-
-      res.status(200).json(formattedTransactions);
     } catch (error) {
       console.log(error);
       next(error);
     }
   }
+  
 }
 
 export default new TransactionController();

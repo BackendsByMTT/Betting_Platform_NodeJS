@@ -317,27 +317,33 @@ class BetController {
   async getAgentBets(req: Request, res: Response, next: NextFunction) {
     try {
       const { agentId } = req.params;
-      const { date } = req.query;
+      const { date, page = 1, limit = 10 } = req.query; 
+  
       if (!agentId) throw createHttpError(400, "Agent Id not Found");
-
+  
       const agent = await User.findById(agentId);
       if (!agent) throw createHttpError(404, "Agent Not Found");
+  
       const query: any = {};
-
+  
       if (date) {
         const filterDate = new Date(date as string);
         const startOfDay = new Date(filterDate.setHours(0, 0, 0, 0));
         const endOfDay = new Date(filterDate.setHours(23, 59, 59, 999));
         query.createdAt = { $gte: startOfDay, $lte: endOfDay };
       }
+  
       const playerUnderAgent = agent.players;
       if (playerUnderAgent.length === 0)
         return res.status(200).json({ message: "No Players Under Agent" });
-
+  
       const bets = await Bet.find({
         player: { $in: playerUnderAgent },
         ...query,
       })
+        .sort({ createdAt: -1 }) 
+        .skip((+page - 1) * +limit) 
+        .limit(+limit)
         .populate("player", "username _id")
         .populate({
           path: "data",
@@ -346,28 +352,42 @@ class BetController {
             select: "event_id sport_title commence_time status",
           },
         });
-
-      res.status(200).json(bets);
+  
+      const totalBets = await Bet.countDocuments({
+        player: { $in: playerUnderAgent },
+        ...query,
+      });
+  
+      res.status(200).json({
+        totalBets,
+        page: +page,
+        limit: +limit,
+        totalPages: Math.ceil(totalBets / +limit),
+        data:bets,
+      });
     } catch (error) {
       next(error);
     }
   }
+  
 
   //GET ALL BETS FOR ADMIN
   async getAdminBets(req: Request, res: Response, next: NextFunction) {
     try {
-      const { date } = req.query;
+      const { date, page = 1, limit = 10 } = req.query;
       const query: any = {};
-
+  
       if (date) {
         const filterDate = new Date(date as string);
         const startOfDay = new Date(filterDate.setHours(0, 0, 0, 0));
         const endOfDay = new Date(filterDate.setHours(23, 59, 59, 999));
         query.createdAt = { $gte: startOfDay, $lte: endOfDay };
       }
-
+  
       const bets = await Bet.find(query)
         .sort({ createdAt: -1 })
+        .skip((+page - 1) * +limit) 
+        .limit(+limit) 
         .populate("player", "username _id")
         .populate({
           path: "data",
@@ -376,28 +396,36 @@ class BetController {
             select: "event_id sport_title commence_time status",
           },
         });
-      console.log(bets);
-
-      res.status(200).json(bets);
+  
+      const totalBets = await Bet.countDocuments(query); 
+  
+      res.status(200).json({
+        totalBets,
+        page: +page,
+        limit: +limit,
+        totalPages: Math.ceil(totalBets / +limit),
+        data:bets,
+      });
     } catch (error) {
       console.log(error);
       next(error);
     }
   }
-
+  
   //GET BETS FOR A PLAYER
   async getBetForPlayer(req: Request, res: Response, next: NextFunction) {
     try {
       const { player } = req.params;
-      const { type, status, date, search } = req.query;
+      const { type, status, date, search, page = 1, limit = 10 } = req.query;
       const query: any = {};
+      
       if (date) {
         const filterDate = new Date(date as string);
         const startOfDay = new Date(filterDate.setHours(0, 0, 0, 0));
         const endOfDay = new Date(filterDate.setHours(23, 59, 59, 999));
         query.createdAt = { $gte: startOfDay, $lte: endOfDay };
       }
-
+  
       let playerDoc: any;
       if (type === "id") {
         playerDoc = await PlayerModel.findById(player);
@@ -412,7 +440,7 @@ class BetController {
       } else {
         throw createHttpError(400, "User Id or Username not provided");
       }
-
+  
       const playerBets = await Bet.find({
         player: playerDoc._id,
         ...(status === "combo" || status === "all" ? {} : { status }),
@@ -420,6 +448,8 @@ class BetController {
         ...query,
       })
         .sort({ createdAt: -1 })
+        .skip((+page - 1) * +limit) // Pagination
+        .limit(+limit) // Limit results per page
         .populate("player", "username _id")
         .populate({
           path: "data",
@@ -428,14 +458,27 @@ class BetController {
             select: "event_id sport_title commence_time status",
           },
         });
-
-      res.status(200).json(playerBets);
+  
+      const totalBets = await Bet.countDocuments({
+        player: playerDoc._id,
+        ...(status === "combo" || status === "all" ? {} : { status }),
+        ...(status === "combo" && { betType: "combo" }),
+        ...query,
+      });
+  
+      res.status(200).json({
+        totalBets,
+        page: +page,
+        limit: +limit,
+        totalPages: Math.ceil(totalBets / +limit),
+        data:playerBets,
+      });
     } catch (error) {
       console.log(error);
       next(error);
     }
   }
-
+  
   async redeemBetInfo(req: Request, res: Response, next: NextFunction) {
     try {
       const _req = req as AuthRequest;
