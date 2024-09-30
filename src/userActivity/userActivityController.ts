@@ -85,14 +85,19 @@ class UserActivityController {
 
   async getBetsAndTransactionsInActivitySession(req: Request, res: Response, next: NextFunction) {
     try {
-      console.log("red");
-
+  
       const { startTime, endTime, playerId } = req.body;
+      const playerObjectId = new mongoose.Types.ObjectId(playerId);
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+  
+      // console.log(start, end, playerId, "here");
+  
       const betsAggregation = Bet.aggregate([
         {
           $match: {
-            createdAt: { $gte: new Date(startTime), $lte: new Date(endTime) },
-            player: playerId, // Filter by playerId
+            createdAt: { $gte: start, $lte: end },
+            player: playerObjectId, 
           },
         },
         {
@@ -125,11 +130,11 @@ class UserActivityController {
           },
         },
       ]);
-
+  
       const transactionsAggregation = Transaction.aggregate([
         {
           $match: {
-            date: { $gte: new Date(startTime), $lte: new Date(endTime) },
+            date: { $gte: start, $lte: end },
           }
         },
         {
@@ -210,16 +215,18 @@ class UserActivityController {
           },
         }
       ]);
-
+  
       const [bets, transactions] = await Promise.all([betsAggregation, transactionsAggregation]);
-
-      return res.status(200).json({ bets, transactions }
-      );
-
+      // console.log(bets, transactions, "here is the bets and transactions");
+      
+      return res.status(200).json({ bets, transactions });
+  
     } catch (error) {
-
+      // console.log(error, "error");
+      next(error);
     }
   };
+  
 
 
 

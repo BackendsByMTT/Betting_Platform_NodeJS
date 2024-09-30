@@ -3,7 +3,6 @@ import mongoose from 'mongoose';
 import Bet, { BetDetail } from '../bets/betModel';
 import { config } from '../config/config';
 import { parentPort } from 'worker_threads';
-import { IBetDetail } from '../bets/betsType';
 import { migrateLegacyBet } from '../utils/migration';
 import Store from '../store/storeController';
 

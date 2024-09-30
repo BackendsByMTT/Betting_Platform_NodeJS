@@ -8,14 +8,13 @@ import Player from "../players/playerModel";
 import { redisClient } from "../redisclient";
 import { IBet, IBetDetail } from "../bets/betsType";
 import { migrateLegacyBet } from "../utils/migration";
+import { BETTYPE } from "../utils/utils";
 
 
 class ProcessingQueueWorker {
-  private tick: number;
   private redisClient: typeof redisClient;
 
   constructor() {
-    this.tick = 0;
     this.redisClient = redisClient;
     this.connectDB()
   }
@@ -74,7 +73,7 @@ class ProcessingQueueWorker {
               await removeItem(JSON.stringify(bet));
             }
           }
-        }
+        } 
 
         const sportKeys = Array.from(sports);
 
@@ -170,18 +169,18 @@ class ProcessingQueueWorker {
         let result: "won" | "lost" | "draw" | "pending" | "failed";
 
         switch (currentBetDetail.category) {
-          case "h2h":
+          case BETTYPE.H2H:
             result = this.checkH2HBetResult(currentBetDetail, gameData);
             break;
 
-          case "spread":
+          case BETTYPE.SPREAD:
             result = this.checkSpreadBetResult(currentBetDetail, gameData);
             break;
 
-          case "totals":
+          case BETTYPE.TOTAL:
             result = this.checkTotalsBetResult(currentBetDetail, gameData);
             break;
-          case "outrights":
+          case BETTYPE.OUTRIGHT:
             result = this.checkOutrightsBetResult(currentBetDetail, gameData);
             break;
           default:
