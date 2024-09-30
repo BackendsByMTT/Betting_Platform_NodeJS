@@ -89,9 +89,9 @@ class UserActivityController {
       const { startTime, endTime, playerId } = req.body;
       const playerObjectId = new mongoose.Types.ObjectId(playerId);
       const start = new Date(startTime);
-      const end = new Date(endTime);
+      const end = endTime ? new Date(endTime) : new Date();  // Default to current time if endTime is not provided
   
-      // console.log(start, end, playerId, "here");
+      console.log(start, end, playerId, "here");
   
       const betsAggregation = Bet.aggregate([
         {
@@ -134,8 +134,15 @@ class UserActivityController {
       const transactionsAggregation = Transaction.aggregate([
         {
           $match: {
-            date: { $gte: start, $lte: end },
-          }
+            $and: [
+              { date: { $gte: start, $lte: end } }, 
+              { 
+                $or: [
+                  { sender: playerObjectId },
+                  { receiver: playerObjectId }, 
+                ] 
+              }
+            ]          }
         },
         {
           $lookup: {
