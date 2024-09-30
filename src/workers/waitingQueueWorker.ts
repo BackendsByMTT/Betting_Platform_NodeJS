@@ -23,7 +23,6 @@ async function connectDB() {
   }
 }
 
-connectDB();
 
 export async function checkBetsCommenceTime() {
   const now = new Date().getTime();
@@ -65,7 +64,6 @@ export async function checkBetsCommenceTime() {
   }
 }
 
-
 async function getLatestOddsForAllEvents() {
   try {
     // Fetch globalEventRooms data from Redis
@@ -106,7 +104,6 @@ async function getLatestOddsForAllEvents() {
     console.error("Error fetching latest odds:", error);
   }
 }
-
 
 
 async function migrateAllBetsFromWaitingQueue() {
@@ -154,6 +151,7 @@ async function migrateLegacyResolvedBets() {
   }
 }
 
+
 async function migrateLegacyPendingBets() {
   try {
     // Get all the bets in the waiting queue in one go
@@ -187,22 +185,23 @@ async function migrateLegacyPendingBets() {
 
 
 async function startWorker() {
-  console.log("Waiting Queue Worker Started")
-  setInterval(async () => {
+  while (true) {
     try {
+      await checkBetsCommenceTime();
+      await getLatestOddsForAllEvents();
       await migrateAllBetsFromWaitingQueue();
       await migrateLegacyResolvedBets();
       await migrateLegacyPendingBets();
-      await checkBetsCommenceTime();
-      await getLatestOddsForAllEvents();
     } catch (error) {
-      console.error("Error in setInterval Waiting Queue Worker:", error);
+      console.log("Error in Waiting Queue Worker:", error);
     }
-  }, 30000); // Runs every 30 seconds
+    await new Promise((resolve) => setTimeout(resolve, 30000));
+  }
 }
 
 parentPort.on('message', async (message) => {
   if (message === "start") {
-    startWorker();
+    await connectDB()
+    await startWorker();
   }
 })

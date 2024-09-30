@@ -39,17 +39,16 @@ class ProcessingQueueWorker {
   async startWorker(): Promise<void> {
     console.log("Processing Queue Worker Started")
 
-    setInterval(async () => {
+    while (true) {
       try {
-        console.log("Processing Bet.........");
-
         this.redisClient.publish('live-update', 'true')
-
         await this.processBetsFromQueue()
       } catch (error) {
-        console.error("Error in setInterval Waiting Queue Worker:", error);
+        console.error("Error Processing Queue Worker:", error);
       }
-    }, 30000);
+
+      await new Promise((resolve) => setTimeout(resolve, 30000));
+    }
   }
 
   async processBetsFromQueue(): Promise<void> {
@@ -73,7 +72,7 @@ class ProcessingQueueWorker {
               await removeItem(JSON.stringify(bet));
             }
           }
-        } 
+        }
 
         const sportKeys = Array.from(sports);
 
@@ -271,7 +270,7 @@ class ProcessingQueueWorker {
       );
       return;
     }
-    if(anyBetDrawn && !betOnDrawn){
+    if (anyBetDrawn && !betOnDrawn) {
       await Bet.findByIdAndUpdate(parentBet._id, { status: 'lost', isResolved: true });
       await this.publishRedisNotification(
         "BET_LOST",
@@ -299,7 +298,7 @@ class ProcessingQueueWorker {
         `Congratulations! Bet with ID ${parentBet._id} has won. You have been awarded $${parentBet.possibleWinningAmount}.`,
         `Player ${player.username} has won the bet with ID ${parentBet._id}, and the winnings of $${parentBet.possibleWinningAmount} have been awarded.`
       );
-    }else if(allBetsDrawn && betOnDrawn){
+    } else if (allBetsDrawn && betOnDrawn) {
       await Bet.findByIdAndUpdate(parentBet._id, { status: 'draw', isResolved: true });
       await this.awardWinningsToPlayer(parentBet.player, parentBet.possibleWinningAmount);
       await this.publishRedisNotification(
@@ -312,7 +311,7 @@ class ProcessingQueueWorker {
         `Player ${player.username} has won the bet with ID ${parentBet._id}, and the winnings of $${parentBet.possibleWinningAmount} have been awarded.`
       );
     }
-     else {
+    else {
       await Bet.findByIdAndUpdate(parentBet._id, { isResolved: false });
       console.log(`Parent Bet with ID ${parentBet._id} has not been resolved.`);
     }
@@ -360,7 +359,7 @@ class ProcessingQueueWorker {
     if (homeTeamScore === awayTeamScore) {
       return betOnTeam === "draw" ? "won" : "draw";
     }
-  
+
     const gameWinner = homeTeamScore > awayTeamScore ? homeTeamName : awayTeamName;
     return betOnTeam === gameWinner ? "won" : "lost";
   }
@@ -440,7 +439,7 @@ class ProcessingQueueWorker {
 
     if (totalScore === totalLine) {
       console.log("The total score equals the total line. It's a push (draw).");
-      return "draw"; 
+      return "draw";
     }
 
     if (betOn === "Over") {
@@ -449,46 +448,46 @@ class ProcessingQueueWorker {
       return totalScore < totalLine ? "won" : "lost";
     }
 
-    return "pending";  
+    return "pending";
   }
 
   checkOutrightsBetResult(betDetail: IBetDetail, gameData: any): "won" | "lost" | "draw" | "pending" | "failed" {
     const betOn = betDetail.bet_on.name;
-  
+
     if (!gameData.completed) {
       return "pending";
     }
-  
+
     const betOnTeam = gameData.scores.find((team: any) => team.name === betOn);
-  
+
     if (!betOnTeam) {
       return "failed";
     }
-  
+
     const betOnTeamScore = betOnTeam.score;
-  
+
     if (betOnTeamScore == null || betOnTeamScore < 0) {
       console.error("Error: Invalid scores found (negative values or not defined).");
       return "failed";
     }
-  
+
     const allScores = gameData.scores.map((team: any) => team.score);
     const maxScore = Math.max(...allScores);
     const teamsWithMaxScore = gameData.scores.filter((team: any) => team.score === maxScore);
-  
+
     if (teamsWithMaxScore.length > 1) {
       return "draw";
     }
-  
+
     if (teamsWithMaxScore[0].name === betOn) {
       return "won";
     } else {
       return "lost";
     }
-  
+
     return "pending";
   }
-  
+
 
   async publishRedisNotification(type: string, playerId: string, username: string, agentId: string, betId: string, playerMessage: string, agentMessage: string): Promise<void> {
     try {
