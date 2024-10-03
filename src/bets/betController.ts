@@ -13,7 +13,7 @@ import { config } from "../config/config";
 import { redisClient } from "../redisclient";
 
 import { removeFromWaitingQueue } from "../utils/WaitingQueue";
-import { removeItem } from "../utils/ProcessingQueue";
+import { checkIfBetIsInProcessingQueue, removeItem } from "../utils/ProcessingQueue";
 
 class BetController {
   private redisGetAsync;
@@ -812,6 +812,12 @@ class BetController {
 
       }
 
+      const isInProcessingQueue = await checkIfBetIsInProcessingQueue(detailId);
+      if (isInProcessingQueue) {
+        return res.status(409).json({ message: "Bet is in the processing queue and cannot be updated." });
+      }
+  
+
       //Handling removing the bet from processing queue or waiting queue
 
       if (existingBetDetails.status === "pending" && betDetails.status !== "pending") {
@@ -833,7 +839,34 @@ class BetController {
       if (!existingParentBet) {
         throw createHttpError(404, "Bet Not Found")
       }
-
+      const playerId = existingParentBet.player;
+      const player = await PlayerModel.findById(playerId);
+  
+      if (!player) {
+        throw createHttpError(404, "Player Not Found");
+      }
+  
+    
+      const previousStakeAmount = existingParentBet.amount;
+      const newStakeAmount = betData.amount;
+      
+      if (newStakeAmount > previousStakeAmount) {
+        const additionalAmountRequired = newStakeAmount - previousStakeAmount;
+      
+        if (player.credits < additionalAmountRequired) {
+          return res.status(400).json({ message: "Insufficient credits to increase the bet amount." });
+        }
+      
+        player.credits -= additionalAmountRequired;
+        await player.save();
+      }else if(newStakeAmount < previousStakeAmount){
+        const amountToReturn = previousStakeAmount - newStakeAmount;
+        player.credits += amountToReturn;
+        await player.save();
+      }
+      
+      existingParentBet.amount = newStakeAmount;
+      await existingParentBet.save();
 
       const session = await mongoose.startSession();
       session.startTransaction();
@@ -862,9 +895,7 @@ class BetController {
 
       let playerResponseMessage;
       let agentResponseMessage;
-      const playerId = parentBet.player;
       const possibleWinningAmount = parentBet.possibleWinningAmount;
-      const player = await PlayerModel.findById(playerId);
 
       if (!hasNotWon && parentBet.status !== "won") {
         if (player) {
@@ -883,12 +914,15 @@ class BetController {
         playerResponseMessage = `Bet Won!. Bet Amount: $${parentBet.amount}`;
         agentResponseMessage = `Your Player ${player.username} has won a bet. Bet Amount: $${parentBet.amount}`
 
-      } else if (existingParentBet.status === "won" && hasNotWon) {
+      } else if ((existingParentBet.status === "won" || existingParentBet.status === "redeem") && hasNotWon) {
         if (player) {
-          player.credits -= possibleWinningAmount;
-          await player.save();
+          if (player.credits >= possibleWinningAmount) {
+              player.credits -= possibleWinningAmount;
+              await player.save();
+          } else {
+              console.log('Insufficient credits');
+          }
         }
-
         parentBet.status = "lost";
         parentBet.isResolved = true;
         await parentBet.save();

@@ -29,3 +29,19 @@ export async function size(): Promise<number> {
 export async function removeItem(item: string): Promise<number> {
   return redisClient.lrem(QUEUE_NAME, 0, item);
 }
+
+// check if a bet detail exist in procesing queue
+export async function checkIfBetIsInProcessingQueue(betId: string): Promise<boolean> {
+  console.log(betId, "processing");
+
+  const queueItems = await getAll();
+
+  for (const item of queueItems) {
+    const parsedItem = JSON.parse(item); 
+    if (parsedItem._id === betId) { 
+      return true; 
+    }
+  }
+
+  return false; 
+}
