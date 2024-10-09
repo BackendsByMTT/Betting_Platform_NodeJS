@@ -8,14 +8,13 @@ import Player from "../players/playerModel";
 import { redisClient } from "../redisclient";
 import { IBet, IBetDetail } from "../bets/betsType";
 import { migrateLegacyBet } from "../utils/migration";
+import { BETTYPE } from "../utils/utils";
 
 
 class ProcessingQueueWorker {
-  private tick: number;
   private redisClient: typeof redisClient;
 
   constructor() {
-    this.tick = 0;
     this.redisClient = redisClient;
     this.connectDB()
   }
@@ -40,17 +39,16 @@ class ProcessingQueueWorker {
   async startWorker(): Promise<void> {
     console.log("Processing Queue Worker Started")
 
-    setInterval(async () => {
+    while (true) {
       try {
-        console.log("Processing Bet.........");
-
         this.redisClient.publish('live-update', 'true')
-
         await this.processBetsFromQueue()
       } catch (error) {
-        console.error("Error in setInterval Waiting Queue Worker:", error);
+        console.error("Error Processing Queue Worker:", error);
       }
-    }, 30000);
+
+      await new Promise((resolve) => setTimeout(resolve, 30000));
+    }
   }
 
   async processBetsFromQueue(): Promise<void> {
@@ -170,18 +168,20 @@ class ProcessingQueueWorker {
         let result: "won" | "lost" | "draw" | "pending" | "failed";
 
         switch (currentBetDetail.category) {
-          case "h2h":
+          case BETTYPE.H2H:
             result = this.checkH2HBetResult(currentBetDetail, gameData);
             break;
 
-          case "spread":
+          case BETTYPE.SPREAD:
             result = this.checkSpreadBetResult(currentBetDetail, gameData);
             break;
 
-          case "totals":
+          case BETTYPE.TOTAL:
             result = this.checkTotalsBetResult(currentBetDetail, gameData);
             break;
-
+          case BETTYPE.OUTRIGHT:
+            result = this.checkOutrightsBetResult(currentBetDetail, gameData);
+            break;
           default:
             console.error(`Unknown bet category: ${currentBetDetail.category}`);
             return;
@@ -240,6 +240,8 @@ class ProcessingQueueWorker {
 
     const anyBetLost = updatedBetDetails.some(detail => detail.status === 'lost');
     const anyBetFailed = updatedBetDetails.some(detail => detail.status === 'failed');
+    const anyBetDrawn = updatedBetDetails.some(detail => detail.status === 'draw');
+    const betOnDrawn = updatedBetDetails.every(detail => detail.bet_on.name === 'Draw');
 
     if (anyBetLost) {
       await Bet.findByIdAndUpdate(parentBet._id, { status: 'lost', isResolved: true });
@@ -268,8 +270,21 @@ class ProcessingQueueWorker {
       );
       return;
     }
-
+    if (anyBetDrawn && !betOnDrawn) {
+      await Bet.findByIdAndUpdate(parentBet._id, { status: 'lost', isResolved: true });
+      await this.publishRedisNotification(
+        "BET_LOST",
+        player._id.toString(),
+        player.username,
+        agentId,
+        parentBet._id.toString(),
+        `Unfortunately, you lost your bet (ID: ${parentBet._id}). Better luck next time!`,
+        `A player's bet (ID: ${parentBet._id}) has lost. Please review the details.`
+      );
+      return;
+    }
     const allBetsWon = updatedBetDetails.every(detail => detail.status === 'won');
+    const allBetsDrawn = updatedBetDetails.every(detail => detail.status === 'draw');
 
     if (allBetsWon) {
       await Bet.findByIdAndUpdate(parentBet._id, { status: 'won', isResolved: true });
@@ -283,9 +298,22 @@ class ProcessingQueueWorker {
         `Congratulations! Bet with ID ${parentBet._id} has won. You have been awarded $${parentBet.possibleWinningAmount}.`,
         `Player ${player.username} has won the bet with ID ${parentBet._id}, and the winnings of $${parentBet.possibleWinningAmount} have been awarded.`
       );
-    } else {
-      await Bet.findByIdAndUpdate(parentBet._id, { isResolved: true });
-      console.log(`Parent Bet with ID ${parentBet._id} has been resolved.`);
+    } else if (allBetsDrawn && betOnDrawn) {
+      await Bet.findByIdAndUpdate(parentBet._id, { status: 'draw', isResolved: true });
+      await this.awardWinningsToPlayer(parentBet.player, parentBet.possibleWinningAmount);
+      await this.publishRedisNotification(
+        "BET_DRAWN",
+        player._id.toString(),
+        player.username,
+        agentId,
+        parentBet._id.toString(),
+        `Congratulations! Bet with ID ${parentBet._id} has drawn. You have been awarded $${parentBet.possibleWinningAmount}.`,
+        `Player ${player.username} has won the bet with ID ${parentBet._id}, and the winnings of $${parentBet.possibleWinningAmount} have been awarded.`
+      );
+    }
+    else {
+      await Bet.findByIdAndUpdate(parentBet._id, { isResolved: false });
+      console.log(`Parent Bet with ID ${parentBet._id} has not been resolved.`);
     }
   }
 
@@ -329,7 +357,7 @@ class ProcessingQueueWorker {
     }
 
     if (homeTeamScore === awayTeamScore) {
-      return "draw";
+      return betOnTeam === "draw" ? "won" : "draw";
     }
 
     const gameWinner = homeTeamScore > awayTeamScore ? homeTeamName : awayTeamName;
@@ -411,7 +439,7 @@ class ProcessingQueueWorker {
 
     if (totalScore === totalLine) {
       console.log("The total score equals the total line. It's a push (draw).");
-      return "draw"; 
+      return "draw";
     }
 
     if (betOn === "Over") {
@@ -420,8 +448,51 @@ class ProcessingQueueWorker {
       return totalScore < totalLine ? "won" : "lost";
     }
 
-    return "pending";  
+    return "pending";
   }
+
+  checkOutrightsBetResult(betDetail: IBetDetail, gameData: any): "won" | "lost" | "draw" | "pending" | "failed" {
+    const betOn = betDetail.bet_on.name;
+
+    if (!gameData.completed) {
+      return "pending";
+    }
+
+    const betOnTeam = gameData.scores.find((team: any) => team.name === betOn);
+
+    if (!betOnTeam) {
+      return "failed";
+    }
+
+    const betOnTeamScore = betOnTeam.score;
+
+    if (betOnTeamScore == null || betOnTeamScore < 0) {
+      console.error("Error: Invalid scores found (negative values or not defined).");
+      return "failed";
+    }
+
+    const allScores = gameData.scores.map((team: any) => team.score);
+    const maxScore = Math.max(...allScores);
+    const teamsWithMaxScore = gameData.scores.filter((team: any) => team.score === maxScore);
+
+    if (teamsWithMaxScore.length > 1) {
+      const isBetOnTeamInDraw = teamsWithMaxScore.some((team: any) => team.name === betOn);      
+      if (isBetOnTeamInDraw) {
+        return "draw";
+      } else {
+        return "lost";
+      }
+    }
+
+    if (teamsWithMaxScore[0].name === betOn) {
+      return "won";
+    } else {
+      return "lost";
+    }
+
+    return "pending";
+  }
+
 
   async publishRedisNotification(type: string, playerId: string, username: string, agentId: string, betId: string, playerMessage: string, agentMessage: string): Promise<void> {
     try {

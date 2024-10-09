@@ -43,6 +43,8 @@ class BetController {
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
+      // console.log(betDetails, "BET DETAILS");
+      // return;
 
       // const tempBetId = betDetailIds.id
 
@@ -74,71 +76,88 @@ class BetController {
       }
 
 
-      // for (const betDetailData of betDetails) {
-
-      //   const cacheKey = `eventOdds:${betDetailData.sport_key}:${betDetailData.event_id}:${betDetailData.category}`;
-        
-      //   let cachedOddsData:any = await redisClient.get(cacheKey);
-        
-      //   if (!cachedOddsData) {
-      //     const oddsData = await Store.getEventOdds(
-      //       betDetailData.sport_key,
-      //       betDetailData.event_id,
-      //       betDetailData.category,
-      //       'us',
-      //       'decimal',
-      //       'iso'
-      //     );
+      //   for (const betDetailData of betDetails) {
+      //     const cacheKey = `eventOdds:${betDetailData.sport_key}:${betDetailData.event_id}:${betDetailData.category}`;
           
-      //     cachedOddsData = JSON.stringify(oddsData);
+      //     let cachedOddsData:any = await redisClient.get(cacheKey);
           
-      //     await redisClient.set(cacheKey, cachedOddsData, 'EX', 30);
-      //   }
-      
-      //   cachedOddsData = JSON.parse(cachedOddsData);
-      //   console.log(cachedOddsData, "cached odds data");
-      
-      //   let cachedEvent = null;
-      
-      //   if (Array.isArray(cachedOddsData)) {
-      //     cachedEvent = cachedOddsData.find(event => event.id === betDetailData.event_id);
-      //   } else if (cachedOddsData && cachedOddsData.id === betDetailData.event_id) {
-      //     cachedEvent = cachedOddsData;
-      //   }
+      //     // Fetch new odds and set cache if no cached data found
+      //     if (!cachedOddsData) {
+      //       const oddsData = await Store.getEventOdds(
+      //         betDetailData.sport_key,
+      //         betDetailData.event_id,
+      //         betDetailData.category,
+      //         'us',
+      //         'decimal',
+      //         'iso'
+      //       );
+            
+      //       cachedOddsData = JSON.stringify(oddsData);
+            
+      //       // Set cache with expiration time reduced to 3 seconds
+      //       await redisClient.set(cacheKey, cachedOddsData, 'EX', 3);
+      //     }
         
-      //   if (!cachedEvent) {
-      //     throw new Error(`Event with ID ${betDetailData.event_id} not found in cached data.`);
-      //   }
-      
-      //   const cachedBookmaker = cachedEvent.bookmakers.find(bookmaker => bookmaker.key === betDetailData.bookmaker);
-      
-      //   if (!cachedBookmaker) {
-      //     throw new Error(`Bookmaker ${betDetailData.bookmaker} not found for event`);
-      //   }
-      
-      //   const cachedMarket = cachedBookmaker.markets.find(market => market.key === betDetailData.category);
-      
-      //   if (!cachedMarket) {
-      //     throw new Error("Market not found in cached data");
-      //   }
-      
-      //   const cachedOutcome = cachedMarket.outcomes.find(outcome => outcome.name === betDetailData.bet_on.name);
-      //   console.log(cachedOutcome, "co");
-      
-      //   if (!cachedOutcome) {
-      //     throw new Error(`Outcome for ${betDetailData.bet_on.name} not found in cached data`);
-      //   }
+      //     cachedOddsData = JSON.parse(cachedOddsData);
+      //     let cachedEvent = null;
         
-      //   console.log(cachedOutcome.price, betDetailData.bet_on.odds, "cache ODDS");
+      //     if (Array.isArray(cachedOddsData)) {
+      //       cachedEvent = cachedOddsData.find(event => event.id === betDetailData.event_id);
+      //     } else if (cachedOddsData && cachedOddsData.id === betDetailData.event_id) {
+      //       cachedEvent = cachedOddsData;
+      //     }
+          
+      //     if (!cachedEvent) {
+      //       throw new Error(`Event with ID ${betDetailData.event_id} not found in cached data.`);
+      //     }
+        
+      //     const cachedBookmaker = cachedEvent.bookmakers.find(bookmaker => bookmaker.key === betDetailData.bookmaker);
+        
+      //     if (!cachedBookmaker) {
+      //       throw new Error(`Bookmaker ${betDetailData.bookmaker} not found for event`);
+      //     }
+        
+      //     const cachedMarket = cachedBookmaker.markets.find(market => market.key === betDetailData.category);
+        
+      //     if (!cachedMarket) {
+      //       throw new Error("Market not found in cached data");
+      //     }
+        
+      //     const cachedOutcome = cachedMarket.outcomes.find(outcome => outcome.name === betDetailData.bet_on.name);
+        
+      //     if (!cachedOutcome) {
+      //       throw new Error(`Outcome for ${betDetailData.bet_on.name} not found in cached data`);
+      //     }
+          
+      //     console.log(cachedOutcome.price, betDetailData.bet_on.odds, "cache ODDS");
+        
+      //     // Compare cached odds with submitted odds
+      //     if (cachedOutcome.price !== betDetailData.bet_on.odds) {
+      //       // Fetch fresh odds before error if mismatch is found
+      //       const freshOddsData = await Store.getEventOdds(
+      //         betDetailData.sport_key,
+      //         betDetailData.event_id,
+      //         betDetailData.category,
+      //         'us',
+      //         'decimal',
+      //         'iso'
+      //       );
+      //       const freshMarket = freshOddsData.bookmakers.find(bookmaker => bookmaker.key === betDetailData.bookmaker)
+      //                                ?.markets.find(market => market.key === betDetailData.category);
       
-      //   // Compare cached odds with submitted odds
-      //   if (cachedOutcome.price !== betDetailData.bet_on.odds) {
-      //     playerSocket.sendData({
-      //       type: "ODDS_MISMATCH",
-      //       message: `Odds for ${betDetailData.bet_on.name} have changed. Please refresh and try again.`
-      //     });
-      //     throw new Error(`Odds for ${betDetailData.bet_on.name} have changed.`);
-      //   }
+      //       const freshOutcome = freshMarket?.outcomes.find(outcome => outcome.name === betDetailData.bet_on.name);
+            
+      //       if (freshOutcome && freshOutcome.price === betDetailData.bet_on.odds) {
+      //         // Update cache with fresh data to avoid errors in future bets
+      //         await redisClient.set(cacheKey, JSON.stringify(freshOddsData), 'EX', 3);
+      //       } else {
+      //         playerSocket.sendData({
+      //           type: "ODDS_MISMATCH",
+      //           message: `Odds for ${betDetailData.bet_on.name} have changed. Please refresh and try again.`
+      //         });
+      //         throw new Error(`Odds for ${betDetailData.bet_on.name} have changed.`);
+      //       }
+      //     }
       // }
       
 
@@ -205,8 +224,7 @@ class BetController {
         betType,
       });
       await bet.save({ session });
-
-      const playerBets = await Bet.find({
+          const playerBets = await Bet.find({
         player: player._id,
       })
         .session(session)
@@ -299,27 +317,33 @@ class BetController {
   async getAgentBets(req: Request, res: Response, next: NextFunction) {
     try {
       const { agentId } = req.params;
-      const { date } = req.query;
+      const { date, page = 1, limit = 10 } = req.query; 
+  
       if (!agentId) throw createHttpError(400, "Agent Id not Found");
-
+  
       const agent = await User.findById(agentId);
       if (!agent) throw createHttpError(404, "Agent Not Found");
+  
       const query: any = {};
-
+  
       if (date) {
         const filterDate = new Date(date as string);
         const startOfDay = new Date(filterDate.setHours(0, 0, 0, 0));
         const endOfDay = new Date(filterDate.setHours(23, 59, 59, 999));
         query.createdAt = { $gte: startOfDay, $lte: endOfDay };
       }
+  
       const playerUnderAgent = agent.players;
       if (playerUnderAgent.length === 0)
         return res.status(200).json({ message: "No Players Under Agent" });
-
+  
       const bets = await Bet.find({
         player: { $in: playerUnderAgent },
         ...query,
       })
+        .sort({ createdAt: -1 }) 
+        .skip((+page - 1) * +limit) 
+        .limit(+limit)
         .populate("player", "username _id")
         .populate({
           path: "data",
@@ -328,28 +352,42 @@ class BetController {
             select: "event_id sport_title commence_time status",
           },
         });
-
-      res.status(200).json(bets);
+  
+      const totalBets = await Bet.countDocuments({
+        player: { $in: playerUnderAgent },
+        ...query,
+      });
+  
+      res.status(200).json({
+        totalBets,
+        page: +page,
+        limit: +limit,
+        totalPages: Math.ceil(totalBets / +limit),
+        data:bets,
+      });
     } catch (error) {
       next(error);
     }
   }
+  
 
   //GET ALL BETS FOR ADMIN
   async getAdminBets(req: Request, res: Response, next: NextFunction) {
     try {
-      const { date } = req.query;
+      const { date, page = 1, limit = 10 } = req.query;
       const query: any = {};
-
+  
       if (date) {
         const filterDate = new Date(date as string);
         const startOfDay = new Date(filterDate.setHours(0, 0, 0, 0));
         const endOfDay = new Date(filterDate.setHours(23, 59, 59, 999));
         query.createdAt = { $gte: startOfDay, $lte: endOfDay };
       }
-
+  
       const bets = await Bet.find(query)
         .sort({ createdAt: -1 })
+        .skip((+page - 1) * +limit) 
+        .limit(+limit) 
         .populate("player", "username _id")
         .populate({
           path: "data",
@@ -358,28 +396,36 @@ class BetController {
             select: "event_id sport_title commence_time status",
           },
         });
-      console.log(bets);
-
-      res.status(200).json(bets);
+  
+      const totalBets = await Bet.countDocuments(query); 
+  
+      res.status(200).json({
+        totalBets,
+        page: +page,
+        limit: +limit,
+        totalPages: Math.ceil(totalBets / +limit),
+        data:bets,
+      });
     } catch (error) {
       console.log(error);
       next(error);
     }
   }
-
+  
   //GET BETS FOR A PLAYER
   async getBetForPlayer(req: Request, res: Response, next: NextFunction) {
     try {
       const { player } = req.params;
-      const { type, status, date, search } = req.query;
+      const { type, status, date, search, page = 1, limit = 10 } = req.query;
       const query: any = {};
+      
       if (date) {
         const filterDate = new Date(date as string);
         const startOfDay = new Date(filterDate.setHours(0, 0, 0, 0));
         const endOfDay = new Date(filterDate.setHours(23, 59, 59, 999));
         query.createdAt = { $gte: startOfDay, $lte: endOfDay };
       }
-
+  
       let playerDoc: any;
       if (type === "id") {
         playerDoc = await PlayerModel.findById(player);
@@ -394,7 +440,7 @@ class BetController {
       } else {
         throw createHttpError(400, "User Id or Username not provided");
       }
-
+  
       const playerBets = await Bet.find({
         player: playerDoc._id,
         ...(status === "combo" || status === "all" ? {} : { status }),
@@ -402,6 +448,8 @@ class BetController {
         ...query,
       })
         .sort({ createdAt: -1 })
+        .skip((+page - 1) * +limit) // Pagination
+        .limit(+limit) // Limit results per page
         .populate("player", "username _id")
         .populate({
           path: "data",
@@ -410,14 +458,27 @@ class BetController {
             select: "event_id sport_title commence_time status",
           },
         });
-
-      res.status(200).json(playerBets);
+  
+      const totalBets = await Bet.countDocuments({
+        player: playerDoc._id,
+        ...(status === "combo" || status === "all" ? {} : { status }),
+        ...(status === "combo" && { betType: "combo" }),
+        ...query,
+      });
+  
+      res.status(200).json({
+        totalBets,
+        page: +page,
+        limit: +limit,
+        totalPages: Math.ceil(totalBets / +limit),
+        data:playerBets,
+      });
     } catch (error) {
       console.log(error);
       next(error);
     }
   }
-
+  
   async redeemBetInfo(req: Request, res: Response, next: NextFunction) {
     try {
       const _req = req as AuthRequest;

@@ -82,3 +82,11 @@ export interface SearchQuery {
   amount?: number;
 }
 
+export enum BETTYPE {
+  H2H = "h2h",
+  TOTAL = "totals",
+  SPREAD = "spreads",
+  OUTRIGHT = "outrights",
+}
+
+

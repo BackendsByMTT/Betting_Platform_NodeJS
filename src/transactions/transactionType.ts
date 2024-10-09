@@ -9,3 +9,13 @@ export interface ITransaction extends Document {
   amount: number;
   date: Date;
 }
+
+export interface CustomAggregationStage {
+  $lookup?: any;
+  $unwind?: any;
+  $match?: any;
+  $project?: any;
+  $sort?: any;
+  $skip?: number;
+  $limit?: number;
+}
