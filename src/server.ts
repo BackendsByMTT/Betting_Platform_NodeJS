@@ -16,6 +16,7 @@ import { config } from "./config/config";
 import notificationRoutes from "./notifications/notificationRoutes";
 import userActivityRoutes from "./userActivity/userActivityRoutes";
 import bannerRoutes from "./banner/bannerRoutes";
+import scoreRoutes from "./scores/scoreRoutes";
 
 const app = express();
 
@@ -40,7 +41,7 @@ app.use("/api/bets", checkUser, betRoutes);
 app.use("/api/userActivities",checkUser, userActivityRoutes);
 app.use("/api/notifications",checkUser, notificationRoutes);
 app.use("/api/banner", checkUser, bannerRoutes);
-
+app.use("/api/score", checkUser, scoreRoutes);
 app.get("/", (req, res, next) => {
   const health = {
     uptime: process.uptime(),
