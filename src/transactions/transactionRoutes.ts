@@ -2,13 +2,12 @@ import express from "express";
 import transactionController from "./transactionController";
 import { checkUser, verifyRole } from "../utils/middleware";
 const transactionRoutes = express.Router();
-
+transactionRoutes.get("/monthly", verifyRole(["admin"]), transactionController.getMonthlyTransactionStats)
 transactionRoutes.post("/", verifyRole(["admin", "agent", "distributor", "subdistributor"]), transactionController.transaction);
 transactionRoutes.get("/", verifyRole(["admin"]), transactionController.getAllTransactions);
 transactionRoutes.get("/:userId", verifyRole(["admin"]), transactionController.getSpecificUserTransactions);
 transactionRoutes.get("/:superior/subordinate", transactionController.getSuperiorSubordinateTransaction);
 transactionRoutes.get("/:player/players", checkUser, verifyRole(["admin","distributor", "subdistributor", "agent"]), transactionController.getSpecificPlayerTransactions);
-transactionRoutes.get("/monthly", verifyRole(["admin"]), transactionController.getMonthlyTransactionStats)
 
 export default transactionRoutes;
 

@@ -235,6 +235,8 @@ class TransactionController {
   }
   async getMonthlyTransactionStats(req: Request, res: Response, next: NextFunction) {
     try {
+      console.log("HERE");
+      
       const { year } = req.query;
   
       const matchStage: Record<string, any> = {};
