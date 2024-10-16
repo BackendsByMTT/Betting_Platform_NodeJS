@@ -36,7 +36,7 @@ app.use("/api/players", checkUser, playerRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/subordinates", checkUser, subordinateRoutes);
 app.use("/api/store", checkUser, storeRoutes);
-app.use("/api/transactions", checkUser, transactionRoutes);
+app.use("/api/transactions", checkUser,  transactionRoutes);
 app.use("/api/bets", checkUser, betRoutes);
 app.use("/api/userActivities",checkUser, userActivityRoutes);
 app.use("/api/notifications",checkUser, notificationRoutes);

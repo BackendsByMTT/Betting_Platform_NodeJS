@@ -233,6 +233,55 @@ class TransactionController {
       next(error);
     }
   }
+  async getMonthlyTransactionStats(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { year } = req.query;
+  
+      const matchStage: Record<string, any> = {};
+  
+      if (year) {
+        const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
+        const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
+        matchStage['date'] = { $gte: startDate, $lte: endDate };
+      }
+  
+      const pipeline: any[] = [
+        {
+          $match: matchStage, 
+        },
+        {
+          $group: {
+            _id: { $month: "$date" }, 
+            totalRechargeAmount: {
+              $sum: {
+                $cond: [{ $eq: ["$type", "recharge"] }, "$amount", 0],
+              },
+            },
+            totalRedeemAmount: {
+              $sum: {
+                $cond: [{ $eq: ["$type", "redeem"] }, "$amount", 0],
+              },
+            },
+            transactionCount: { $sum: 1 }, 
+          },
+        },
+        {
+          $sort: { "_id": 1 }, 
+        },
+      ];
+  
+      const monthlyStats = await Transaction.aggregate(pipeline);
+  
+      res.status(200).json({
+        success: true,
+        data: monthlyStats,
+      });
+    } catch (error) {
+      console.error(error);
+      next(error);
+    }
+  }
+  
   
 
   //SPECIFIC USER TRANSACTIONS

@@ -8,6 +8,8 @@ transactionRoutes.get("/", verifyRole(["admin"]), transactionController.getAllTr
 transactionRoutes.get("/:userId", verifyRole(["admin"]), transactionController.getSpecificUserTransactions);
 transactionRoutes.get("/:superior/subordinate", transactionController.getSuperiorSubordinateTransaction);
 transactionRoutes.get("/:player/players", checkUser, verifyRole(["admin","distributor", "subdistributor", "agent"]), transactionController.getSpecificPlayerTransactions);
+transactionRoutes.get("/monthly", verifyRole(["admin"]), transactionController.getMonthlyTransactionStats)
+
 export default transactionRoutes;
 
 
