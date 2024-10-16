@@ -272,10 +272,9 @@ class TransactionController {
   
       const monthlyStats = await Transaction.aggregate(pipeline);
   
-      res.status(200).json({
-        success: true,
-        data: monthlyStats,
-      });
+      res.status(200).json(
+        monthlyStats
+      );
     } catch (error) {
       console.error(error);
       next(error);
