@@ -93,7 +93,7 @@ class UserController {
         (await Player.findOne({ username: sanitizedUsername }));
 
       if (!user) {
-        throw createHttpError(401, "User not found");
+        throw createHttpError(401, "Username or password is incorrect");
       }
 
       const userStatus = user.status === "inactive";
@@ -106,7 +106,7 @@ class UserController {
         user.password
       );
       if (!isPasswordValid) {
-        throw createHttpError(401, "Incoreect password");
+        throw createHttpError(401, "Username or password is incorrect");
       }
 
       user.lastLogin = new Date();
