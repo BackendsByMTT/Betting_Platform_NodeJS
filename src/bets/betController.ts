@@ -825,7 +825,7 @@ async resolveBet(req: Request, res: Response, next: NextFunction) {
       removeFromWaitingQueue(JSON.stringify(data));
     });
 
-    return res.status(200).json({ message: "Bet detail status updated", data:updatedBetDetails });
+    return res.status(200).json({ message: "Bet detail status updated", data:parentBet });
   } catch (error) {
     console.log(error);
     
