@@ -3,6 +3,8 @@ import transactionController from "./transactionController";
 import { checkUser, verifyRole } from "../utils/middleware";
 const transactionRoutes = express.Router();
 transactionRoutes.get("/monthly", verifyRole(["admin"]), transactionController.getMonthlyTransactionStats)
+transactionRoutes.get("/monthlyUser", transactionController.getMonthlyTransactionStatsForUser)
+
 transactionRoutes.post("/", verifyRole(["admin", "agent", "distributor", "subdistributor"]), transactionController.transaction);
 transactionRoutes.get("/", verifyRole(["admin"]), transactionController.getAllTransactions);
 transactionRoutes.get("/:userId", verifyRole(["admin"]), transactionController.getSpecificUserTransactions);
