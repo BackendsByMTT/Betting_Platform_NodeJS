@@ -166,7 +166,7 @@ class PlayerController {
                 }
                 res.status(200).json({
                     message: "Player updated successfully",
-                    player: updatedPlayer,
+                    data: updatedPlayer,
                 });
             }
             catch (error) {
@@ -203,7 +203,7 @@ class PlayerController {
                     agent.players = agent.players.filter((playerId) => playerId.toString() !== id);
                     yield agent.save();
                 }
-                res.status(200).json({ message: "Player deleted successfully" });
+                res.status(200).json({ message: "Player deleted successfully", data: deletedPlayer });
             }
             catch (error) {
                 next(error);

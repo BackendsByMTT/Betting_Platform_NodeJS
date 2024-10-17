@@ -41,7 +41,6 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const betModel_1 = __importStar(require("../bets/betModel"));
 const config_1 = require("../config/config");
 const worker_threads_1 = require("worker_threads");
-const migration_1 = require("../utils/migration");
 const storeController_1 = __importDefault(require("../store/storeController"));
 function connectDB() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -125,86 +124,12 @@ function getLatestOddsForAllEvents() {
         }
     });
 }
-function migrateAllBetsFromWaitingQueue() {
-    return __awaiter(this, void 0, void 0, function* () {
-        const bets = yield redisclient_1.redisClient.zrange('waitingQueue', 0, -1);
-        for (const bet of bets) {
-            const data = JSON.parse(bet);
-            const betId = data.betId;
-            try {
-                let betDetail = yield betModel_1.BetDetail.findById(betId).lean();
-                if (!betDetail) {
-                    console.log(`BetDetail not found for betId: ${betId}, skipping this bet.`);
-                    continue;
-                }
-                if (!betDetail.key) {
-                    console.log(`BetDetail with ID ${betId} is missing the 'key' field, skipping.`);
-                    continue;
-                }
-                const betParent = yield betModel_1.default.findById(betDetail.key).lean();
-                if (!betParent) {
-                    console.log(`Parent Bet not found for betId: ${betId}, skipping.`);
-                    continue;
-                }
-                yield (0, migration_1.migrateLegacyBet)(betDetail);
-            }
-            catch (error) {
-                console.log(`Error migrating bet with ID ${betId}:`, error);
-            }
-        }
-    });
-}
-function migrateLegacyResolvedBets() {
-    return __awaiter(this, void 0, void 0, function* () {
-        const bets = yield betModel_1.BetDetail.find({ status: { $ne: 'pending' } }).lean();
-        for (const bet of bets) {
-            try {
-                yield (0, migration_1.migrateLegacyBet)(bet);
-            }
-            catch (error) {
-                console.log(`Error updating bet with ID ${bet._id}:`, error);
-            }
-        }
-    });
-}
-function migrateLegacyPendingBets() {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            // Get all the bets in the waiting queue in one go
-            const queueBets = yield redisclient_1.redisClient.zrange('waitingQueue', 0, -1);
-            // Extract bet IDs and store them in a Set for quick lookup
-            const waitingQueueBetIds = new Set(queueBets.map(bet => JSON.parse(bet).betId));
-            // Find bets with status 'pending' and isResolved as false
-            const pendingBets = yield betModel_1.BetDetail.find({ status: 'pending', isResolved: false }).lean();
-            for (const bet of pendingBets) {
-                try {
-                    // Check if the bet is in the waiting queue
-                    if (waitingQueueBetIds.has(bet._id.toString())) {
-                        console.log(`Bet with ID ${bet._id} is in the waiting queue, skipping migration.`);
-                        continue; // Skip this bet if it's in the waiting queue
-                    }
-                    // If not in the queue, migrate the bet
-                    yield (0, migration_1.migrateLegacyBet)(bet);
-                }
-                catch (error) {
-                    console.log(`Error migrating pending bet with ID ${bet._id}:`, error);
-                }
-            }
-        }
-        catch (error) {
-            console.error("Error during migration of legacy pending bets:", error);
-        }
-    });
-}
 function startWorker() {
     return __awaiter(this, void 0, void 0, function* () {
         while (true) {
             try {
                 yield checkBetsCommenceTime();
                 yield getLatestOddsForAllEvents();
-                yield migrateAllBetsFromWaitingQueue();
-                yield migrateLegacyResolvedBets();
-                yield migrateLegacyPendingBets();
             }
             catch (error) {
                 console.log("Error in Waiting Queue Worker:", error);

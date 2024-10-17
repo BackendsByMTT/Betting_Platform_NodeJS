@@ -43,7 +43,7 @@ class TransactionService {
                 //to get the model of sender and reciever
                 const senderModelForDB = type === "redeem" ? receiverModel : senderModel;
                 const receiverModelForDB = type === "redeem" ? senderModel : receiverModel;
-                yield transactionModel_1.default.create([{
+                const transaction = yield transactionModel_1.default.create([{
                         sender: senderUser,
                         receiver: receiverUser,
                         senderModel: senderModelForDB,
@@ -53,6 +53,7 @@ class TransactionService {
                     }], { session });
                 yield session.commitTransaction();
                 console.log("Transaction committed successfully");
+                return transaction[0];
             }
             catch (error) {
                 yield session.abortTransaction();
