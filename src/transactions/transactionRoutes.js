@@ -9,6 +9,8 @@ const middleware_1 = require("../utils/middleware");
 const transactionRoutes = express_1.default.Router();
 transactionRoutes.post("/", (0, middleware_1.verifyRole)(["admin", "agent", "distributor", "subdistributor"]), transactionController_1.default.transaction);
 transactionRoutes.get("/", (0, middleware_1.verifyRole)(["admin"]), transactionController_1.default.getAllTransactions);
+transactionRoutes.get("/admin", transactionController_1.default.getMonthlyTransactionStats);
+transactionRoutes.get("/user", transactionController_1.default.getMonthlyTransactionStatsForUser);
 transactionRoutes.get("/:userId", (0, middleware_1.verifyRole)(["admin"]), transactionController_1.default.getSpecificUserTransactions);
 transactionRoutes.get("/:superior/subordinate", transactionController_1.default.getSuperiorSubordinateTransaction);
 transactionRoutes.get("/:player/players", middleware_1.checkUser, (0, middleware_1.verifyRole)(["admin", "distributor", "subdistributor", "agent"]), transactionController_1.default.getSpecificPlayerTransactions);

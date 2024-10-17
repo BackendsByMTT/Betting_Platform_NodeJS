@@ -600,7 +600,20 @@ class BetController {
             }
         });
     }
-    // UPADTE OR RESOLVE BET
+    // UPDATE OR RESOLVE BET
+    /**
+     *
+     * @req BET details id in params , status in body
+     * - upadte the bet detail with either won or lost
+     * - throw error if bet details not found
+     * - get parent bet id from bet details and find the parent bet, throw error if not found
+     * - find all bet details for parent bet
+     * - check if any bet details is lost or player has not won
+     * - if previously parent bet was won and not it has not won deduct possible winning amount and vice versa
+     * - check if player has enough credit to deduct from ,if not send a message
+     * - notify player
+   
+     */
     resolveBet(req, res, next) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
@@ -617,19 +630,37 @@ class BetController {
                 if (!parentBet) {
                     throw (0, http_errors_1.default)(404, "Parent bet not found");
                 }
-                const parentBetStatus = parentBet.status;
-                if (parentBetStatus === "lost") {
-                    return res.status(200).json({ message: "Bet detail Updated" });
-                }
-                if (status !== "won") {
-                    parentBet.status = "lost";
-                    yield parentBet.save();
-                    return res.status(200).json({ message: "Bet detail Updated" });
-                }
+                // Fetch all related bet details
                 const allBetDetails = yield betModel_1.BetDetail.find({
                     _id: { $in: parentBet.data },
                 });
                 const hasNotWon = allBetDetails.some((detail) => detail.status !== "won");
+                // If the parent bet was previously "won" and now has a "lost" bet detail, update the status
+                if (parentBet.status === "won" && hasNotWon) {
+                    const playerId = parentBet.player;
+                    const betAmount = parentBet.possibleWinningAmount;
+                    const player = yield playerModel_1.default.findById(playerId);
+                    if (!player) {
+                        throw (0, http_errors_1.default)(404, "Player not found");
+                    }
+                    if (player.credits < betAmount) {
+                        yield betModel_1.BetDetail.findByIdAndUpdate(betDetailId, {
+                            status: 'won',
+                        });
+                        return res.status(400).json({
+                            message: "Insufficient credits to deduct bet amount",
+                        });
+                    }
+                    player.credits -= betAmount;
+                    yield player.save();
+                    parentBet.status = "lost";
+                    yield parentBet.save();
+                    const playerSocket = socket_1.users.get(player.username);
+                    if (playerSocket) {
+                        playerSocket.sendData({ type: "CREDITS", credits: player.credits });
+                    }
+                    return res.status(200).json({ message: "Bet detail updated and amount deducted" });
+                }
                 if (!hasNotWon && parentBet.status !== "won") {
                     const playerId = parentBet.player;
                     const possibleWinningAmount = parentBet.possibleWinningAmount;
@@ -645,7 +676,7 @@ class BetController {
                         playerSocket.sendData({ type: "CREDITS", credits: player.credits });
                     }
                 }
-                // remove from waiting queue on resolve
+                // Remove from waiting queue on resolve
                 allBetDetails.forEach((detail) => {
                     const data = {
                         betId: detail._id.toString(),
@@ -656,6 +687,7 @@ class BetController {
                 return res.status(200).json({ message: "Bet detail status updated" });
             }
             catch (error) {
+                console.log(error);
                 next(error);
             }
         });
@@ -672,6 +704,10 @@ class BetController {
                 const existingBetDetails = yield betModel_1.BetDetail.findById(detailId);
                 if (!existingBetDetails) {
                     throw (0, http_errors_1.default)(404, "Bet Detail Not found");
+                }
+                const isInProcessingQueue = yield (0, ProcessingQueue_1.checkIfBetIsInProcessingQueue)(detailId);
+                if (isInProcessingQueue) {
+                    return res.status(409).json({ message: "Bet is in the processing queue and cannot be updated." });
                 }
                 //Handling removing the bet from processing queue or waiting queue
                 if (existingBetDetails.status === "pending" && betDetails.status !== "pending") {
@@ -692,6 +728,28 @@ class BetController {
                 if (!existingParentBet) {
                     throw (0, http_errors_1.default)(404, "Bet Not Found");
                 }
+                const playerId = existingParentBet.player;
+                const player = yield playerModel_1.default.findById(playerId);
+                if (!player) {
+                    throw (0, http_errors_1.default)(404, "Player Not Found");
+                }
+                const previousStakeAmount = existingParentBet.amount;
+                const newStakeAmount = betData.amount;
+                if (newStakeAmount > previousStakeAmount) {
+                    const additionalAmountRequired = newStakeAmount - previousStakeAmount;
+                    if (player.credits < additionalAmountRequired) {
+                        return res.status(400).json({ message: "Insufficient credits to increase the bet amount." });
+                    }
+                    player.credits -= additionalAmountRequired;
+                    yield player.save();
+                }
+                else if (newStakeAmount < previousStakeAmount) {
+                    const amountToReturn = previousStakeAmount - newStakeAmount;
+                    player.credits += amountToReturn;
+                    yield player.save();
+                }
+                existingParentBet.amount = newStakeAmount;
+                yield existingParentBet.save();
                 const session = yield mongoose_1.default.startSession();
                 session.startTransaction();
                 const newupdateData = Object.assign(Object.assign({}, updateData), { isResolved: true });
@@ -712,9 +770,7 @@ class BetController {
                 // );
                 let playerResponseMessage;
                 let agentResponseMessage;
-                const playerId = parentBet.player;
                 const possibleWinningAmount = parentBet.possibleWinningAmount;
-                const player = yield playerModel_1.default.findById(playerId);
                 if (!hasNotWon && parentBet.status !== "won") {
                     if (player) {
                         player.credits += possibleWinningAmount;
@@ -730,10 +786,15 @@ class BetController {
                     playerResponseMessage = `Bet Won!. Bet Amount: $${parentBet.amount}`;
                     agentResponseMessage = `Your Player ${player.username} has won a bet. Bet Amount: $${parentBet.amount}`;
                 }
-                else if (existingParentBet.status === "won" && hasNotWon) {
+                else if ((existingParentBet.status === "won" || existingParentBet.status === "redeem") && hasNotWon) {
                     if (player) {
-                        player.credits -= possibleWinningAmount;
-                        yield player.save();
+                        if (player.credits >= possibleWinningAmount) {
+                            player.credits -= possibleWinningAmount;
+                            yield player.save();
+                        }
+                        else {
+                            console.log('Insufficient credits');
+                        }
                     }
                     parentBet.status = "lost";
                     parentBet.isResolved = true;

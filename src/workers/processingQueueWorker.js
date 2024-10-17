@@ -43,8 +43,8 @@ const ProcessingQueue_1 = require("../utils/ProcessingQueue");
 const config_1 = require("../config/config");
 const playerModel_1 = __importDefault(require("../players/playerModel"));
 const redisclient_1 = require("../redisclient");
-const migration_1 = require("../utils/migration");
 const utils_1 = require("../utils/utils");
+const scoreModel_1 = __importDefault(require("../scores/scoreModel"));
 class ProcessingQueueWorker {
     constructor() {
         this.redisClient = redisclient_1.redisClient;
@@ -164,14 +164,16 @@ class ProcessingQueueWorker {
             let currentBetDetail = null;
             while (retryCount < maxRetries) {
                 try {
-                    const betToMigrate = yield betModel_1.BetDetail.findById(betDetailId).lean();
-                    console.log("MIGRATING IN PROCESSING QUEUE");
-                    yield (0, migration_1.migrateLegacyBet)(betToMigrate);
                     currentBetDetail = yield betModel_1.BetDetail.findById(betDetailId);
                     if (!currentBetDetail) {
                         console.error("BetDetail not found after migration:", betDetailId);
                         return;
                     }
+                    yield scoreModel_1.default.findOneAndUpdate({ event_id: gameData.id }, {
+                        event_id: gameData.id,
+                        teams: gameData.scores,
+                        completed: gameData.completed,
+                    }, { upsert: true, new: true });
                     const parentBet = yield betModel_1.default.findById(currentBetDetail.key);
                     if (!parentBet) {
                         return;

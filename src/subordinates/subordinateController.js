@@ -275,7 +275,7 @@ class SubordinateController {
                 }
                 res.status(200).json({
                     message: "User updated successfully",
-                    agent: updateSubordinate,
+                    data: updateSubordinate,
                 });
             }
             catch (error) {
@@ -305,7 +305,7 @@ class SubordinateController {
                 //REMOVING SUBORDINATE REFERENCE FROM SUPERIOR
                 superior.subordinates = superior.subordinates.filter((superiorId) => superiorId.toString() !== id);
                 yield superior.save();
-                res.status(200).json({ message: "User deleted successfully" });
+                res.status(200).json({ message: "User deleted successfully", data: deleteSubordinate });
             }
             catch (error) {
                 next(error);

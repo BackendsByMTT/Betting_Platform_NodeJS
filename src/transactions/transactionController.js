@@ -61,8 +61,8 @@ class TransactionController {
                         : (() => {
                             throw (0, http_errors_1.default)(500, "Unknown reciever model");
                         })();
-                yield transactionService_1.TransactionService.performTransaction(newObjectId, receiverId, sender, reciever, senderModelName, recieverModelName, sanitizedType, sanitizedAmount, role);
-                res.status(200).json({ message: "Transaction successful" });
+                const transaction = yield transactionService_1.TransactionService.performTransaction(newObjectId, receiverId, sender, reciever, senderModelName, recieverModelName, sanitizedType, sanitizedAmount, role);
+                res.status(200).json({ message: "Transaction successful", data: transaction });
             }
             catch (err) {
                 console.log(err);
@@ -215,6 +215,102 @@ class TransactionController {
             }
             catch (error) {
                 console.log(error);
+                next(error);
+            }
+        });
+    }
+    getMonthlyTransactionStats(req, res, next) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { year } = req.query;
+                const matchStage = {};
+                if (year) {
+                    const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
+                    const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
+                    matchStage['date'] = { $gte: startDate, $lte: endDate };
+                }
+                const pipeline = [
+                    {
+                        $match: matchStage,
+                    },
+                    {
+                        $group: {
+                            _id: { $month: "$date" },
+                            totalRechargeAmount: {
+                                $sum: {
+                                    $cond: [{ $eq: ["$type", "recharge"] }, "$amount", 0],
+                                },
+                            },
+                            totalRedeemAmount: {
+                                $sum: {
+                                    $cond: [{ $eq: ["$type", "redeem"] }, "$amount", 0],
+                                },
+                            },
+                            transactionCount: { $sum: 1 },
+                        },
+                    },
+                    {
+                        $sort: { "_id": 1 },
+                    },
+                ];
+                const monthlyStats = yield transactionModel_1.default.aggregate(pipeline);
+                res.status(200).json(monthlyStats);
+            }
+            catch (error) {
+                console.error(error);
+                next(error);
+            }
+        });
+    }
+    getMonthlyTransactionStatsForUser(req, res, next) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { year } = req.query;
+                const _req = req;
+                const { userId } = _req.user;
+                if (!userId) {
+                    return res.status(400).json({ error: "UserId is required" });
+                }
+                const matchStage = {
+                    $or: [
+                        { sender: new mongoose_1.default.Types.ObjectId(userId) },
+                        { receiver: new mongoose_1.default.Types.ObjectId(userId) },
+                    ],
+                };
+                if (year) {
+                    const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
+                    const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
+                    matchStage['date'] = { $gte: startDate, $lte: endDate };
+                }
+                const pipeline = [
+                    {
+                        $match: matchStage,
+                    },
+                    {
+                        $group: {
+                            _id: { $month: "$date" },
+                            totalRechargeAmount: {
+                                $sum: {
+                                    $cond: [{ $eq: ["$type", "recharge"] }, "$amount", 0],
+                                },
+                            },
+                            totalRedeemAmount: {
+                                $sum: {
+                                    $cond: [{ $eq: ["$type", "redeem"] }, "$amount", 0],
+                                },
+                            },
+                            transactionCount: { $sum: 1 },
+                        },
+                    },
+                    {
+                        $sort: { "_id": 1 },
+                    },
+                ];
+                const monthlyStats = yield transactionModel_1.default.aggregate(pipeline);
+                res.status(200).json(monthlyStats);
+            }
+            catch (error) {
+                console.error(error);
                 next(error);
             }
         });
