@@ -21,6 +21,7 @@ const config_1 = require("../config/config");
 const utils_1 = require("../utils/utils");
 const svg_captcha_1 = __importDefault(require("svg-captcha"));
 const uuid_1 = require("uuid");
+const mongoose_1 = __importDefault(require("mongoose"));
 const transactionModel_1 = __importDefault(require("../transactions/transactionModel"));
 const betModel_1 = __importDefault(require("../bets/betModel"));
 const socket_1 = require("../socket/socket");
@@ -140,6 +141,102 @@ class UserController {
             }
             catch (err) {
                 next(err);
+            }
+        });
+    }
+    //GET Players created by User
+    getCreatedUsersAndPlayersByMonth(req, res, next) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { year } = req.query;
+                const _req = req;
+                const { userId: createdBy } = _req.user;
+                console.log('Created By:', createdBy);
+                console.log('Year:', year);
+                if (!createdBy || !year) {
+                    return res.status(400).json({ error: "createdBy and year are required" });
+                }
+                const parsedYear = parseInt(year, 10);
+                if (isNaN(parsedYear)) {
+                    return res.status(400).json({ error: "Invalid year format" });
+                }
+                const startDate = new Date(`${parsedYear}-01-01T00:00:00.000Z`);
+                const endDate = new Date(`${parsedYear + 1}-01-01T00:00:00.000Z`); // Start of next year for exclusive end
+                console.log('Start Date:', startDate);
+                console.log('End Date:', endDate);
+                const userPipeline = [
+                    {
+                        $match: {
+                            createdBy: new mongoose_1.default.Types.ObjectId(createdBy),
+                            createdAt: {
+                                $gte: startDate,
+                                $lt: endDate,
+                            },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: { $month: "$createdAt" },
+                            userCount: { $sum: 1 },
+                        },
+                    },
+                    {
+                        $sort: { "_id": 1 },
+                    },
+                ];
+                // Player aggregation pipeline
+                const playerPipeline = [
+                    {
+                        $match: {
+                            createdBy: new mongoose_1.default.Types.ObjectId(createdBy),
+                            createdAt: {
+                                $gte: startDate,
+                                $lt: endDate,
+                            },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: { $month: "$createdAt" },
+                            playerCount: { $sum: 1 },
+                        },
+                    },
+                    {
+                        $sort: { "_id": 1 },
+                    },
+                ];
+                // Execute aggregation pipelines
+                const userStats = yield userModel_1.default.aggregate(userPipeline);
+                const playerStats = yield playerModel_1.default.aggregate(playerPipeline);
+                // Log results for debugging
+                console.log('User Stats:', userStats);
+                console.log('Player Stats:', playerStats);
+                const combinedResults = {};
+                userStats.forEach((userStat) => {
+                    combinedResults[userStat._id] = {
+                        month: userStat._id,
+                        users: userStat.userCount || 0,
+                        players: 0,
+                    };
+                });
+                playerStats.forEach((playerStat) => {
+                    if (combinedResults[playerStat._id]) {
+                        combinedResults[playerStat._id].players = playerStat.playerCount || 0;
+                    }
+                    else {
+                        combinedResults[playerStat._id] = {
+                            month: playerStat._id,
+                            users: 0,
+                            players: playerStat.playerCount || 0,
+                        };
+                    }
+                });
+                const monthlyResults = Object.values(combinedResults).sort((a, b) => a.month - b.month);
+                res.status(200).json(monthlyResults);
+            }
+            catch (error) {
+                console.error(error);
+                next(error);
             }
         });
     }

@@ -15,6 +15,7 @@ exports.peek = peek;
 exports.getAll = getAll;
 exports.size = size;
 exports.removeItem = removeItem;
+exports.checkIfBetIsInProcessingQueue = checkIfBetIsInProcessingQueue;
 const redisclient_1 = require("../redisclient");
 const QUEUE_NAME = 'processingQueue';
 // Enqueue an item to the queue
@@ -52,5 +53,19 @@ function size() {
 function removeItem(item) {
     return __awaiter(this, void 0, void 0, function* () {
         return redisclient_1.redisClient.lrem(QUEUE_NAME, 0, item);
+    });
+}
+// check if a bet detail exist in procesing queue
+function checkIfBetIsInProcessingQueue(betId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        console.log(betId, "processing");
+        const queueItems = yield getAll();
+        for (const item of queueItems) {
+            const parsedItem = JSON.parse(item);
+            if (parsedItem._id === betId) {
+                return true;
+            }
+        }
+        return false;
     });
 }
