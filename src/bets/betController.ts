@@ -707,7 +707,7 @@ class BetController {
               )}`,
           })
         );
-        res.status(200).json({ message: "Bet Redeemed Successfully" });
+        res.status(200).json({ message: "Bet Redeemed Successfully" , data:bet});
         if (playerSocket) {
           playerSocket.sendData({ type: "CREDITS", credits: player.credits });
         }
@@ -793,7 +793,7 @@ async resolveBet(req: Request, res: Response, next: NextFunction) {
         playerSocket.sendData({ type: "CREDITS", credits: player.credits });
       }
 
-      return res.status(200).json({ message: "Bet detail updated and amount deducted" });
+      return res.status(200).json({ message: "Bet detail updated and amount deducted" , data:parentBet});
     }
 
     if (!hasNotWon && parentBet.status !== "won") {
@@ -825,7 +825,7 @@ async resolveBet(req: Request, res: Response, next: NextFunction) {
       removeFromWaitingQueue(JSON.stringify(data));
     });
 
-    return res.status(200).json({ message: "Bet detail status updated" });
+    return res.status(200).json({ message: "Bet detail status updated", data:updatedBetDetails });
   } catch (error) {
     console.log(error);
     
@@ -992,7 +992,7 @@ async resolveBet(req: Request, res: Response, next: NextFunction) {
           agentMessage: agentResponseMessage,
         })
       );
-      res.status(200).json({ message: "Bet and BetDetails updated successfully", updatedBet });
+      res.status(200).json({ message: "Bet and BetDetails updated successfully", data:updatedBet });
     } catch (error) {
       console.log(error);
 

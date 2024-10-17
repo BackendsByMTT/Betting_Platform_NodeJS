@@ -58,7 +58,7 @@ class TransactionController {
               throw createHttpError(500, "Unknown reciever model");
             })();
 
-      const transaction = await TransactionService.performTransaction(
+       await TransactionService.performTransaction(
         newObjectId,
         receiverId,
         sender,
@@ -69,7 +69,10 @@ class TransactionController {
         sanitizedAmount,
         role
       );
-      res.status(200).json({ message: "Transaction successful" ,  data:transaction});
+      const updatedRecieverData =  (await User.findById({ _id: receiverId })) ||
+      (await Player.findById({ _id: receiverId }))
+
+      res.status(200).json({ message: "Transaction successful" ,  data:updatedRecieverData});
     } catch (err) {
       console.log(err);
 
