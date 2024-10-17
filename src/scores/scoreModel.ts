@@ -7,22 +7,13 @@ const ScoreSchema: Schema = new Schema({
         required: true,
         unique: true, 
       },
-      home_team: {
-        type: String,
-        required: true,
-      },
-      away_team: {
-        type: String,
-        required: true,
-      },
-      home_score: {
-        type: Number,
-        required: true,
-      },
-      away_score: {
-        type: Number,
-        required: true,
-      },
+      teams: [
+        {
+          name: { type: String, required: true },
+          score: { type: Number, required: true }
+        }
+      ],
+    
       completed: {
         type: Boolean,
         default: false,

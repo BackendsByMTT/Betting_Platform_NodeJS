@@ -157,10 +157,7 @@ class ProcessingQueueWorker {
           { event_id: gameData.id }, 
           {
             event_id: gameData.id,
-            home_team: gameData.home_team,
-            away_team: gameData.away_team,
-            home_score: gameData.scores.find((team: any) => team.name === gameData.home_team)?.score,
-            away_score: gameData.scores.find((team: any) => team.name === gameData.away_team)?.score,
+            teams:gameData.scores, 
             completed: gameData.completed,
           },
           { upsert: true, new: true } 
