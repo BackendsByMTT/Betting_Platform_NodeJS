@@ -9,6 +9,7 @@ import Transaction from "./transactionModel";
 import { CustomAggregationStage } from "./transactionType";
 
 class TransactionController {
+
   // TO RECORD TRANSACTIONS, RECHARGE AND REDEEM
 
   async transaction(req: Request, res: Response, next: NextFunction) {
@@ -336,11 +337,8 @@ class TransactionController {
       next(error);
     }
   }
-  
-  
 
   //SPECIFIC USER TRANSACTIONS
-
   async getSpecificUserTransactions(
     req: Request,
     res: Response,
@@ -665,7 +663,6 @@ class TransactionController {
   // }
 
   //SPECIFIC PLAYER TRANSACTION
-
   async getSpecificPlayerTransactions(
     req: Request,
     res: Response,
