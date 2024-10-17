@@ -589,7 +589,7 @@ class BetController {
                         playerMessage: `A Bet (ID: ${betId}) redeemed successfully with a payout of ${finalPayout.toFixed(2)}!`,
                         agentMessage: `A Player ${player.username} redeemed a bet (ID: ${betId}) with a payout of ${finalPayout.toFixed(2)}`,
                     }));
-                    res.status(200).json({ message: "Bet Redeemed Successfully" });
+                    res.status(200).json({ message: "Bet Redeemed Successfully", data: bet });
                     if (playerSocket) {
                         playerSocket.sendData({ type: "CREDITS", credits: player.credits });
                     }
@@ -659,7 +659,7 @@ class BetController {
                     if (playerSocket) {
                         playerSocket.sendData({ type: "CREDITS", credits: player.credits });
                     }
-                    return res.status(200).json({ message: "Bet detail updated and amount deducted" });
+                    return res.status(200).json({ message: "Bet detail updated and amount deducted", data: parentBet });
                 }
                 if (!hasNotWon && parentBet.status !== "won") {
                     const playerId = parentBet.player;
@@ -684,7 +684,7 @@ class BetController {
                     };
                     (0, WaitingQueue_1.removeFromWaitingQueue)(JSON.stringify(data));
                 });
-                return res.status(200).json({ message: "Bet detail status updated" });
+                return res.status(200).json({ message: "Bet detail status updated", data: updatedBetDetails });
             }
             catch (error) {
                 console.log(error);
@@ -821,7 +821,7 @@ class BetController {
                     playerMessage: playerResponseMessage,
                     agentMessage: agentResponseMessage,
                 }));
-                res.status(200).json({ message: "Bet and BetDetails updated successfully", updatedBet });
+                res.status(200).json({ message: "Bet and BetDetails updated successfully", data: updatedBet });
             }
             catch (error) {
                 console.log(error);
