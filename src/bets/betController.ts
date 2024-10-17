@@ -13,7 +13,7 @@ import { config } from "../config/config";
 import { redisClient } from "../redisclient";
 
 import { removeFromWaitingQueue } from "../utils/WaitingQueue";
-import { removeItem } from "../utils/ProcessingQueue";
+import { checkIfBetIsInProcessingQueue, removeItem } from "../utils/ProcessingQueue";
 
 class BetController {
   private redisGetAsync;
@@ -717,82 +717,121 @@ class BetController {
     }
   }
 
-  // UPADTE OR RESOLVE BET
-  async resolveBet(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { betDetailId } = req.params;
-      const { status } = req.body; // won - lost
+ // UPDATE OR RESOLVE BET
+ /**
+  * 
+  * @req BET details id in params , status in body
+  * upadte the bet detail with either won or lost
+  * throw error if bet details not found 
+  * get parent bet id from bet details and find the parent bet, throw error if not found
+  * find all bet details for parent bet
+  * check if any bet details is lost or player has not won
+  * if previously parent bet was won and not it has not won deduct possible winning amount and vice versa
+  * check if player has enough credit to deduct from ,if not send a message
+  * notify player
 
-      const updatedBetDetails = await BetDetail.findByIdAndUpdate(
-        betDetailId,
-        {
-          status: status,
-        },
-        { new: true }
-      );
+  */
+async resolveBet(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { betDetailId } = req.params;
+    const { status } = req.body; // won - lost
 
-      if (!updatedBetDetails) {
-        throw createHttpError(404, "Bet detail not found");
-      }
+    const updatedBetDetails = await BetDetail.findByIdAndUpdate(
+      betDetailId,
+      {
+        status: status,
+      },
+      { new: true }
+    );
 
-      const parentBetId = updatedBetDetails.key;
-      const parentBet = await Bet.findById(parentBetId);
-
-      if (!parentBet) {
-        throw createHttpError(404, "Parent bet not found");
-      }
-
-      const parentBetStatus = parentBet.status;
-
-      if (parentBetStatus === "lost") {
-        return res.status(200).json({ message: "Bet detail Updated" });
-      }
-
-      if (status !== "won") {
-        parentBet.status = "lost";
-        await parentBet.save();
-
-        return res.status(200).json({ message: "Bet detail Updated" });
-      }
-
-      const allBetDetails = await BetDetail.find({
-        _id: { $in: parentBet.data },
-      });
-      const hasNotWon = allBetDetails.some((detail) => detail.status !== "won");
-
-      if (!hasNotWon && parentBet.status !== "won") {
-        const playerId = parentBet.player;
-        const possibleWinningAmount = parentBet.possibleWinningAmount;
-        const player = await PlayerModel.findById(playerId);
-
-        if (player) {
-          player.credits += possibleWinningAmount;
-          await player.save();
-        }
-
-        parentBet.status = "won";
-        await parentBet.save();
-
-        const playerSocket = users.get(player.username);
-        if (playerSocket) {
-          playerSocket.sendData({ type: "CREDITS", credits: player.credits });
-        }
-      }
-
-      // remove from waiting queue on resolve
-      allBetDetails.forEach((detail) => {
-        const data = {
-          betId: detail._id.toString(),
-          commence_time: new Date(detail.commence_time),
-        };
-
-        removeFromWaitingQueue(JSON.stringify(data));
-      });
-      return res.status(200).json({ message: "Bet detail status updated" });
-    } catch (error) {
-      next(error);
+    if (!updatedBetDetails) {
+      throw createHttpError(404, "Bet detail not found");
     }
+
+    const parentBetId = updatedBetDetails.key;
+    const parentBet = await Bet.findById(parentBetId);
+
+    if (!parentBet) {
+      throw createHttpError(404, "Parent bet not found");
+    }
+
+    // Fetch all related bet details
+    const allBetDetails = await BetDetail.find({
+      _id: { $in: parentBet.data },
+    });
+
+    const hasNotWon = allBetDetails.some((detail) => detail.status !== "won");
+
+    // If the parent bet was previously "won" and now has a "lost" bet detail, update the status
+    if (parentBet.status === "won" && hasNotWon) {      
+      const playerId = parentBet.player;
+      const betAmount = parentBet.possibleWinningAmount;
+      const player = await PlayerModel.findById(playerId);
+
+      if (!player) {
+        throw createHttpError(404, "Player not found");
+      }
+
+      if (player.credits < betAmount) {
+        await BetDetail.findByIdAndUpdate(betDetailId, {
+          status: 'won', 
+        });
+        
+        return res.status(400).json({
+          message: "Insufficient credits to deduct bet amount",
+        });
+      }
+
+      player.credits -= betAmount;
+      await player.save();
+
+      parentBet.status = "lost";
+      await parentBet.save();
+
+      const playerSocket = users.get(player.username);
+      if (playerSocket) {
+        playerSocket.sendData({ type: "CREDITS", credits: player.credits });
+      }
+
+      return res.status(200).json({ message: "Bet detail updated and amount deducted" });
+    }
+
+    if (!hasNotWon && parentBet.status !== "won") {
+      const playerId = parentBet.player;
+      const possibleWinningAmount = parentBet.possibleWinningAmount;
+      const player = await PlayerModel.findById(playerId);
+
+      if (player) {
+        player.credits += possibleWinningAmount;
+        await player.save();
+      }
+
+      parentBet.status = "won";
+      await parentBet.save();
+
+      const playerSocket = users.get(player.username);
+      if (playerSocket) {
+        playerSocket.sendData({ type: "CREDITS", credits: player.credits });
+      }
+    }
+
+    // Remove from waiting queue on resolve
+    allBetDetails.forEach((detail) => {
+      const data = {
+        betId: detail._id.toString(),
+        commence_time: new Date(detail.commence_time),
+      };
+
+      removeFromWaitingQueue(JSON.stringify(data));
+    });
+
+    return res.status(200).json({ message: "Bet detail status updated" });
+  } catch (error) {
+    console.log(error);
+    
+    next(error);
   }
+}
 
   async updateBet(req: Request, res: Response, next: NextFunction) {
     try {
@@ -811,6 +850,12 @@ class BetController {
         throw createHttpError(404, "Bet Detail Not found")
 
       }
+
+      const isInProcessingQueue = await checkIfBetIsInProcessingQueue(detailId);
+      if (isInProcessingQueue) {
+        return res.status(409).json({ message: "Bet is in the processing queue and cannot be updated." });
+      }
+  
 
       //Handling removing the bet from processing queue or waiting queue
 
@@ -833,7 +878,34 @@ class BetController {
       if (!existingParentBet) {
         throw createHttpError(404, "Bet Not Found")
       }
-
+      const playerId = existingParentBet.player;
+      const player = await PlayerModel.findById(playerId);
+  
+      if (!player) {
+        throw createHttpError(404, "Player Not Found");
+      }
+  
+    
+      const previousStakeAmount = existingParentBet.amount;
+      const newStakeAmount = betData.amount;
+      
+      if (newStakeAmount > previousStakeAmount) {
+        const additionalAmountRequired = newStakeAmount - previousStakeAmount;
+      
+        if (player.credits < additionalAmountRequired) {
+          return res.status(400).json({ message: "Insufficient credits to increase the bet amount." });
+        }
+      
+        player.credits -= additionalAmountRequired;
+        await player.save();
+      }else if(newStakeAmount < previousStakeAmount){
+        const amountToReturn = previousStakeAmount - newStakeAmount;
+        player.credits += amountToReturn;
+        await player.save();
+      }
+      
+      existingParentBet.amount = newStakeAmount;
+      await existingParentBet.save();
 
       const session = await mongoose.startSession();
       session.startTransaction();
@@ -862,9 +934,7 @@ class BetController {
 
       let playerResponseMessage;
       let agentResponseMessage;
-      const playerId = parentBet.player;
       const possibleWinningAmount = parentBet.possibleWinningAmount;
-      const player = await PlayerModel.findById(playerId);
 
       if (!hasNotWon && parentBet.status !== "won") {
         if (player) {
@@ -883,12 +953,15 @@ class BetController {
         playerResponseMessage = `Bet Won!. Bet Amount: $${parentBet.amount}`;
         agentResponseMessage = `Your Player ${player.username} has won a bet. Bet Amount: $${parentBet.amount}`
 
-      } else if (existingParentBet.status === "won" && hasNotWon) {
+      } else if ((existingParentBet.status === "won" || existingParentBet.status === "redeem") && hasNotWon) {
         if (player) {
-          player.credits -= possibleWinningAmount;
-          await player.save();
+          if (player.credits >= possibleWinningAmount) {
+              player.credits -= possibleWinningAmount;
+              await player.save();
+          } else {
+              console.log('Insufficient credits');
+          }
         }
-
         parentBet.status = "lost";
         parentBet.isResolved = true;
         await parentBet.save();

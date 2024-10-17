@@ -9,6 +9,7 @@ import { redisClient } from "../redisclient";
 import { IBet, IBetDetail } from "../bets/betsType";
 import { migrateLegacyBet } from "../utils/migration";
 import { BETTYPE } from "../utils/utils";
+import Score from "../scores/scoreModel";
 
 
 class ProcessingQueueWorker {
@@ -151,6 +152,19 @@ class ProcessingQueueWorker {
           console.error("BetDetail not found after migration:", betDetailId);
           return;
         }
+
+        await Score.findOneAndUpdate(
+          { event_id: gameData.id }, 
+          {
+            event_id: gameData.id,
+            home_team: gameData.home_team,
+            away_team: gameData.away_team,
+            home_score: gameData.scores.find((team: any) => team.name === gameData.home_team)?.score,
+            away_score: gameData.scores.find((team: any) => team.name === gameData.away_team)?.score,
+            completed: gameData.completed,
+          },
+          { upsert: true, new: true } 
+        );
 
         const parentBet: IBet = await Bet.findById(currentBetDetail.key);
         if (!parentBet) {

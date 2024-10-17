@@ -165,6 +165,115 @@ class UserController {
       next(err);
     }
   }
+//GET Players created by User
+async getCreatedUsersAndPlayersByMonth(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { year } = req.query;
+    const _req = req as AuthRequest;
+    const { userId: createdBy } = _req.user;
+
+    console.log('Created By:', createdBy);
+    console.log('Year:', year);
+
+    if (!createdBy || !year) {
+      return res.status(400).json({ error: "createdBy and year are required" });
+    }
+
+    const parsedYear = parseInt(year as string, 10);
+    if (isNaN(parsedYear)) {
+      return res.status(400).json({ error: "Invalid year format" });
+    }
+
+    const startDate = new Date(`${parsedYear}-01-01T00:00:00.000Z`);
+    const endDate = new Date(`${parsedYear + 1}-01-01T00:00:00.000Z`); // Start of next year for exclusive end
+
+    console.log('Start Date:', startDate);
+    console.log('End Date:', endDate);
+
+    const userPipeline: any = [
+      {
+        $match: {
+          createdBy: new mongoose.Types.ObjectId(createdBy),
+          createdAt: {
+            $gte: startDate,
+            $lt: endDate, 
+          },
+        },
+      },
+      {
+        $group: {
+          _id: { $month: "$createdAt" },  
+          userCount: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { "_id": 1 },  
+      },
+    ];
+
+    // Player aggregation pipeline
+    const playerPipeline: any = [
+      {
+        $match: {
+          createdBy: new mongoose.Types.ObjectId(createdBy), 
+          createdAt: {
+            $gte: startDate,
+            $lt: endDate,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: { $month: "$createdAt" },  
+          playerCount: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { "_id": 1 },  
+      },
+    ];
+
+    // Execute aggregation pipelines
+    const userStats = await User.aggregate(userPipeline);
+    const playerStats = await Player.aggregate(playerPipeline);
+    
+    // Log results for debugging
+    console.log('User Stats:', userStats);
+    console.log('Player Stats:', playerStats);
+
+    const combinedResults: any = {};
+
+    userStats.forEach((userStat) => {
+      combinedResults[userStat._id] = {
+        month: userStat._id,
+        users: userStat.userCount || 0,
+        players: 0,
+      };
+    });
+
+    playerStats.forEach((playerStat) => {
+      if (combinedResults[playerStat._id]) {
+        combinedResults[playerStat._id].players = playerStat.playerCount || 0;
+      } else {
+        combinedResults[playerStat._id] = {
+          month: playerStat._id,
+          users: 0,
+          players: playerStat.playerCount || 0,
+        };
+      }
+    });
+
+    const monthlyResults = Object.values(combinedResults).sort((a: any, b: any) => a.month - b.month);
+
+    res.status(200).json(monthlyResults);
+  } catch (error) {
+    console.error(error);
+    next(error);
+  }
+}
+
+
+
 
   //GET SUMMARY(e.g. recent transactions and bets) FOR AGENT AND ADMIN DASHBOARD
 
