@@ -7,8 +7,8 @@ import { config } from "../config/config";
 import Player from "../players/playerModel";
 import { redisClient } from "../redisclient";
 import { IBet, IBetDetail } from "../bets/betsType";
-import { migrateLegacyBet } from "../utils/migration";
 import { BETTYPE } from "../utils/utils";
+import Score from "../scores/scoreModel";
 
 
 class ProcessingQueueWorker {
@@ -139,18 +139,22 @@ class ProcessingQueueWorker {
 
     while (retryCount < maxRetries) {
       try {
-
-        const betToMigrate = await BetDetail.findById(betDetailId).lean()
-
-        console.log("MIGRATING IN PROCESSING QUEUE");
-        await migrateLegacyBet(betToMigrate);
-
         currentBetDetail = await BetDetail.findById(betDetailId);
 
         if (!currentBetDetail) {
           console.error("BetDetail not found after migration:", betDetailId);
           return;
         }
+
+        await Score.findOneAndUpdate(
+          { event_id: gameData.id },
+          {
+            event_id: gameData.id,
+            teams: gameData.scores,
+            completed: gameData.completed,
+          },
+          { upsert: true, new: true }
+        );
 
         const parentBet: IBet = await Bet.findById(currentBetDetail.key);
         if (!parentBet) {
@@ -476,7 +480,7 @@ class ProcessingQueueWorker {
     const teamsWithMaxScore = gameData.scores.filter((team: any) => team.score === maxScore);
 
     if (teamsWithMaxScore.length > 1) {
-      const isBetOnTeamInDraw = teamsWithMaxScore.some((team: any) => team.name === betOn);      
+      const isBetOnTeamInDraw = teamsWithMaxScore.some((team: any) => team.name === betOn);
       if (isBetOnTeamInDraw) {
         return "draw";
       } else {

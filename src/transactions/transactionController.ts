@@ -9,6 +9,7 @@ import Transaction from "./transactionModel";
 import { CustomAggregationStage } from "./transactionType";
 
 class TransactionController {
+
   // TO RECORD TRANSACTIONS, RECHARGE AND REDEEM
 
   async transaction(req: Request, res: Response, next: NextFunction) {
@@ -57,7 +58,7 @@ class TransactionController {
               throw createHttpError(500, "Unknown reciever model");
             })();
 
-      await TransactionService.performTransaction(
+      const transaction = await TransactionService.performTransaction(
         newObjectId,
         receiverId,
         sender,
@@ -68,7 +69,7 @@ class TransactionController {
         sanitizedAmount,
         role
       );
-      res.status(200).json({ message: "Transaction successful" });
+      res.status(200).json({ message: "Transaction successful" ,  data:transaction});
     } catch (err) {
       console.log(err);
 
@@ -233,10 +234,111 @@ class TransactionController {
       next(error);
     }
   }
+  async getMonthlyTransactionStats(req: Request, res: Response, next: NextFunction) {
+    try {      
+      const { year } = req.query;
   
+      const matchStage: Record<string, any> = {};
+  
+      if (year) {
+        const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
+        const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
+        matchStage['date'] = { $gte: startDate, $lte: endDate };
+      }
+  
+      const pipeline: any[] = [
+        {
+          $match: matchStage, 
+        },
+        {
+          $group: {
+            _id: { $month: "$date" }, 
+            totalRechargeAmount: {
+              $sum: {
+                $cond: [{ $eq: ["$type", "recharge"] }, "$amount", 0],
+              },
+            },
+            totalRedeemAmount: {
+              $sum: {
+                $cond: [{ $eq: ["$type", "redeem"] }, "$amount", 0],
+              },
+            },
+            transactionCount: { $sum: 1 }, 
+          },
+        },
+        {
+          $sort: { "_id": 1 }, 
+        },
+      ];
+  
+      const monthlyStats = await Transaction.aggregate(pipeline);
+  
+      res.status(200).json(
+        monthlyStats
+      );
+    } catch (error) {
+      console.error(error);
+      next(error);
+    }
+  }
+  async getMonthlyTransactionStatsForUser(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { year} = req.query;
+      const _req = req as AuthRequest;
+      const { userId} = _req.user;
+
+      if (!userId) {
+        return res.status(400).json({ error: "UserId is required" });
+      }
+  
+      const matchStage: Record<string, any> = {
+        $or: [
+          { sender:new mongoose.Types.ObjectId(userId) },
+          { receiver:new  mongoose.Types.ObjectId(userId) },
+        ],
+      };
+  
+      if (year) {
+        const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
+        const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
+        matchStage['date'] = { $gte: startDate, $lte: endDate };
+      }
+  
+      const pipeline: any[] = [
+        {
+          $match: matchStage,
+        },
+        {
+          $group: {
+            _id: { $month: "$date" },
+            totalRechargeAmount: {
+              $sum: {
+                $cond: [{ $eq: ["$type", "recharge"] }, "$amount", 0],
+              },
+            },
+            totalRedeemAmount: {
+              $sum: {
+                $cond: [{ $eq: ["$type", "redeem"] }, "$amount", 0],
+              },
+            },
+            transactionCount: { $sum: 1 },
+          },
+        },
+        {
+          $sort: { "_id": 1 },
+        },
+      ];
+  
+      const monthlyStats = await Transaction.aggregate(pipeline);
+  
+      res.status(200).json(monthlyStats);
+    } catch (error) {
+      console.error(error);
+      next(error);
+    }
+  }
 
   //SPECIFIC USER TRANSACTIONS
-
   async getSpecificUserTransactions(
     req: Request,
     res: Response,
@@ -561,7 +663,6 @@ class TransactionController {
   // }
 
   //SPECIFIC PLAYER TRANSACTION
-
   async getSpecificPlayerTransactions(
     req: Request,
     res: Response,

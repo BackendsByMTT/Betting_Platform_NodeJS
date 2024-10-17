@@ -342,7 +342,7 @@ class SubordinateController {
 
       res.status(200).json({
         message: "User updated successfully",
-        agent: updateSubordinate,
+        data: updateSubordinate,
       });
     } catch (error) {
       console.log(error);
@@ -383,7 +383,7 @@ class SubordinateController {
 
       await superior.save();
 
-      res.status(200).json({ message: "User deleted successfully" });
+      res.status(200).json({ message: "User deleted successfully"  , data:deleteSubordinate});
     } catch (error) {
       next(error);
     }

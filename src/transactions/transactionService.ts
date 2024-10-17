@@ -61,7 +61,7 @@ export class TransactionService {
       const senderModelForDB = type === "redeem" ? receiverModel : senderModel;
       const receiverModelForDB = type === "redeem" ? senderModel : receiverModel
 
-      await Transaction.create([{
+       const transaction:any = await Transaction.create([{
         sender: senderUser,
         receiver: receiverUser,
         senderModel: senderModelForDB,
@@ -72,6 +72,7 @@ export class TransactionService {
 
       await session.commitTransaction();
       console.log("Transaction committed successfully");
+      return transaction[0];
     } catch (error) {
       await session.abortTransaction();
       console.error("Transaction aborted due to error:", error.message);

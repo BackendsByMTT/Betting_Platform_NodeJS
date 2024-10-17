@@ -201,7 +201,7 @@ class PlayerController {
   
       res.status(200).json({
         message: "Player updated successfully",
-        player: updatedPlayer,
+        data: updatedPlayer,
       });
     } catch (error) {
       next(error);
@@ -242,7 +242,7 @@ class PlayerController {
         await agent.save();
       }
 
-      res.status(200).json({ message: "Player deleted successfully" });
+      res.status(200).json({ message: "Player deleted successfully", data:deletedPlayer });
     } catch (error) {
       next(error);
     }
