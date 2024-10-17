@@ -721,14 +721,14 @@ class BetController {
  /**
   * 
   * @req BET details id in params , status in body
-  * upadte the bet detail with either won or lost
-  * throw error if bet details not found 
-  * get parent bet id from bet details and find the parent bet, throw error if not found
-  * find all bet details for parent bet
-  * check if any bet details is lost or player has not won
-  * if previously parent bet was won and not it has not won deduct possible winning amount and vice versa
-  * check if player has enough credit to deduct from ,if not send a message
-  * notify player
+  * - upadte the bet detail with either won or lost
+  * - throw error if bet details not found 
+  * - get parent bet id from bet details and find the parent bet, throw error if not found
+  * - find all bet details for parent bet
+  * - check if any bet details is lost or player has not won
+  * - if previously parent bet was won and not it has not won deduct possible winning amount and vice versa
+  * - check if player has enough credit to deduct from ,if not send a message
+  * - notify player
 
   */
 async resolveBet(req: Request, res: Response, next: NextFunction) {
