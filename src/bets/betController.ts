@@ -793,7 +793,7 @@ async resolveBet(req: Request, res: Response, next: NextFunction) {
         playerSocket.sendData({ type: "CREDITS", credits: player.credits });
       }
 
-      return res.status(200).json({ message: "Bet detail updated and amount deducted" , data:updatedBetDetails});
+      return res.status(200).json({ message: "Bet detail updated and amount deducted" , data:parentBet});
     }
 
     if (!hasNotWon && parentBet.status !== "won") {
