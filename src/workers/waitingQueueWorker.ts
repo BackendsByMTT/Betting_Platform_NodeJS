@@ -105,49 +105,12 @@ async function getLatestOddsForAllEvents() {
 }
 
 
-async function migrateAllBetsFromWaitingQueue() {
-  const bets = await redisClient.zrange('waitingQueue', 0, -1);
-
-  for (const bet of bets) {
-    const data = JSON.parse(bet);
-    const betId = data.betId;
-    try {
-      let betDetail = await BetDetail.findById(betId).lean();
-
-      if (!betDetail) {
-        console.log(`BetDetail not found for betId: ${betId}, skipping this bet.`);
-        continue;
-      }
-
-      if (!betDetail.key) {
-        console.log(`BetDetail with ID ${betId} is missing the 'key' field, skipping.`);
-        continue;
-      }
-
-      const betParent = await Bet.findById(betDetail.key).lean();
-
-      if (!betParent) {
-        console.log(`Parent Bet not found for betId: ${betId}, skipping.`);
-        continue;
-      }
-    } catch (error) {
-      console.log(`Error migrating bet with ID ${betId}:`, error);
-    }
-  }
-}
-
-
-
-
-
-
 
 async function startWorker() {
   while (true) {
     try {
       await checkBetsCommenceTime();
       await getLatestOddsForAllEvents();
-      await migrateAllBetsFromWaitingQueue();
     } catch (error) {
       console.log("Error in Waiting Queue Worker:", error);
     }
