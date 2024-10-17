@@ -87,7 +87,7 @@ class UserController {
                 const user = (yield userModel_1.default.findOne({ username: sanitizedUsername })) ||
                     (yield playerModel_1.default.findOne({ username: sanitizedUsername }));
                 if (!user) {
-                    throw (0, http_errors_1.default)(401, "User not found");
+                    throw (0, http_errors_1.default)(401, "Username or password is incorrect");
                 }
                 const userStatus = user.status === "inactive";
                 if (userStatus) {
@@ -95,7 +95,7 @@ class UserController {
                 }
                 const isPasswordValid = yield bcrypt_1.default.compare(sanitizedPassword, user.password);
                 if (!isPasswordValid) {
-                    throw (0, http_errors_1.default)(401, "Incoreect password");
+                    throw (0, http_errors_1.default)(401, "Username or password is incorrect");
                 }
                 user.lastLogin = new Date();
                 yield user.save();
