@@ -61,8 +61,10 @@ class TransactionController {
                         : (() => {
                             throw (0, http_errors_1.default)(500, "Unknown reciever model");
                         })();
-                const transaction = yield transactionService_1.TransactionService.performTransaction(newObjectId, receiverId, sender, reciever, senderModelName, recieverModelName, sanitizedType, sanitizedAmount, role);
-                res.status(200).json({ message: "Transaction successful", data: transaction });
+                yield transactionService_1.TransactionService.performTransaction(newObjectId, receiverId, sender, reciever, senderModelName, recieverModelName, sanitizedType, sanitizedAmount, role);
+                const updatedRecieverData = (yield userModel_1.default.findById({ _id: receiverId })) ||
+                    (yield playerModel_1.default.findById({ _id: receiverId }));
+                res.status(200).json({ message: "Transaction successful", data: updatedRecieverData });
             }
             catch (err) {
                 console.log(err);
