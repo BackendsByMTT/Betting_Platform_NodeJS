@@ -13,7 +13,7 @@ class scoreContoller {
       try {
         const {eventId} = req.params;
         if(!eventId) throw createHttpError(400, "eventId not found");
-        const score = await Score.find({
+        const score = await Score.findOne({
             event_id:eventId
         })
         res.status(200).json(score);
