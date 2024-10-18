@@ -707,7 +707,12 @@ class BetController {
               )}`,
           })
         );
-        res.status(200).json({ message: "Bet Redeemed Successfully" , data:bet});
+        const poplulatedBet = await Bet.findById(bet._id).populate({
+          path: 'data',
+          model: 'BetDetail',
+        });
+    
+        res.status(200).json({ message: "Bet Redeemed Successfully" , data:poplulatedBet});
         if (playerSocket) {
           playerSocket.sendData({ type: "CREDITS", credits: player.credits });
         }
@@ -754,7 +759,10 @@ async resolveBet(req: Request, res: Response, next: NextFunction) {
     if (!parentBet) {
       throw createHttpError(404, "Parent bet not found");
     }
-
+    const populatedParentBet = await Bet.findById(parentBetId).populate({
+      path: 'data',
+      model: 'BetDetail',
+    });
     // Fetch all related bet details
     const allBetDetails = await BetDetail.find({
       _id: { $in: parentBet.data },
@@ -793,7 +801,7 @@ async resolveBet(req: Request, res: Response, next: NextFunction) {
         playerSocket.sendData({ type: "CREDITS", credits: player.credits });
       }
 
-      return res.status(200).json({ message: "Bet detail updated and amount deducted" , data:parentBet});
+      return res.status(200).json({ message: "Bet detail updated and amount deducted" , data:populatedParentBet});
     }
 
     if (!hasNotWon && parentBet.status !== "won") {
@@ -825,10 +833,7 @@ async resolveBet(req: Request, res: Response, next: NextFunction) {
       removeFromWaitingQueue(JSON.stringify(data));
     });
 
-    const populatedParentBet = await Bet.findById(parentBetId).populate({
-      path: 'data',
-      model: 'BetDetail',
-    });
+    
 
 
     return res.status(200).json({ message: "Bet detail status updated", data:populatedParentBet });
@@ -999,7 +1004,7 @@ async resolveBet(req: Request, res: Response, next: NextFunction) {
         })
       );
 
-      const populatedBet = await Bet.findById(updateData._id).populate({
+      const populatedBet = await Bet.findById(updatedBet._id).populate({
         path: 'data',
         model: 'BetDetail',
       });
