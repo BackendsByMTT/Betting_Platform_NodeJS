@@ -825,7 +825,13 @@ async resolveBet(req: Request, res: Response, next: NextFunction) {
       removeFromWaitingQueue(JSON.stringify(data));
     });
 
-    return res.status(200).json({ message: "Bet detail status updated", data:parentBet });
+    const populatedParentBet = await Bet.findById(parentBetId).populate({
+      path: 'data',
+      model: 'BetDetail',
+    });
+
+
+    return res.status(200).json({ message: "Bet detail status updated", data:populatedParentBet });
   } catch (error) {
     console.log(error);
     
@@ -992,7 +998,13 @@ async resolveBet(req: Request, res: Response, next: NextFunction) {
           agentMessage: agentResponseMessage,
         })
       );
-      res.status(200).json({ message: "Bet and BetDetails updated successfully", data:updatedBet });
+
+      const populatedBet = await Bet.findById(updateData._id).populate({
+        path: 'data',
+        model: 'BetDetail',
+      });
+  
+      res.status(200).json({ message: "Bet and BetDetails updated successfully", data:populatedBet });
     } catch (error) {
       console.log(error);
 
