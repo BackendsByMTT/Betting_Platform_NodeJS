@@ -59,12 +59,47 @@ app.get("/", (req, res, next) => {
     res.status(200).json(health);
 });
 app.use(express_1.default.static("src"));
-app.get("/db-location", (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    const admin = mongoose_1.default.connection.db.admin();
-    const serverStatus = yield admin.serverStatus();
-    res.status(200).json({
-        serverStatus: serverStatus
-    });
+app.get("/db-location", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // Check if the MongoDB connection is ready
+        if (!mongoose_1.default.connection.readyState) {
+            return res.status(500).send(`
+        <html>
+          <body>
+            <h1>Database Connection Error</h1>
+            <p>MongoDB connection is not established.</p>
+          </body>
+        </html>
+      `);
+        }
+        // Access the admin interface and fetch server status
+        const admin = mongoose_1.default.connection.db.admin();
+        const serverStatus = yield admin.serverStatus();
+        // Extract region or host information if available
+        const dbHost = serverStatus.host || "Unknown Host";
+        const region = serverStatus.process || "Region information unavailable";
+        res.status(200).send(`
+      <html>
+        <body>
+          <h1>Database Location Information</h1>
+          <p><strong>Host:</strong> ${dbHost}</p>
+          <p><strong>Region:</strong> ${region}</p>
+          <h2>Server Status</h2>
+          <pre>${JSON.stringify(serverStatus, null, 2)}</pre>
+        </body>
+      </html>
+    `);
+    }
+    catch (error) {
+        res.status(500).send(`
+      <html>
+        <body>
+          <h1>Error</h1>
+          <p>${error.message}</p>
+        </body>
+      </html>
+    `);
+    }
 }));
 const io = new socket_io_1.Server(server, {
     cors: {
