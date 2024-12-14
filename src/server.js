@@ -60,8 +60,8 @@ app.get("/", (req, res, next) => {
 });
 app.use(express_1.default.static("src"));
 app.get("/db-location", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        // Check if the MongoDB connection is ready
         if (!mongoose_1.default.connection.readyState) {
             return res.status(500).send(`
         <html>
@@ -72,20 +72,14 @@ app.get("/db-location", (req, res) => __awaiter(void 0, void 0, void 0, function
         </html>
       `);
         }
-        // Access the admin interface and fetch server status
         const admin = mongoose_1.default.connection.db.admin();
         const serverStatus = yield admin.serverStatus();
-        // Extract region or host information if available
-        const dbHost = serverStatus.host || "Unknown Host";
-        const region = serverStatus.process || "Region information unavailable";
+        const region = ((_a = serverStatus === null || serverStatus === void 0 ? void 0 : serverStatus.tags) === null || _a === void 0 ? void 0 : _a.region) || "Region information unavailable";
         res.status(200).send(`
       <html>
         <body>
-          <h1>Database Location Information</h1>
-          <p><strong>Host:</strong> ${dbHost}</p>
+          <h1>Database Region Information</h1>
           <p><strong>Region:</strong> ${region}</p>
-          <h2>Server Status</h2>
-          <pre>${JSON.stringify(serverStatus, null, 2)}</pre>
         </body>
       </html>
     `);
